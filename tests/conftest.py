@@ -40,17 +40,16 @@ def db(db_path: str) -> Database:
 def task_repo(db: Database):
     """Return a SQLiteTaskRepository instance.
 
-    This fixture will be implemented in Task 5.
-
     Args:
         db: The database fixture.
 
     Returns:
         A SQLiteTaskRepository instance.
     """
-    # Will be: from app.infrastructure.repositories import SQLiteTaskRepository
-    # return SQLiteTaskRepository(db)
-    pytest.skip("task_repo fixture will be implemented in Task 5")
+    from app.infrastructure.sqlite_repository import SQLiteTaskRepository
+
+    repo = SQLiteTaskRepository(db)
+    return repo
 
 
 @pytest.fixture
