@@ -409,10 +409,44 @@ nodes:
 
 ### 8.1 E2E 测试要求
 
-**必须实现两种模式的端到端测试：**
+**必须实现的端到端测试：**
 
 1. **test_websocket_mode.py** - WebSocket 实时模式完整流程
 2. **test_polling_mode.py** - 轮询模式完整流程（Fallback）
+3. **test_workflow_version_upgrade.py** - 工作流版本升级场景
+
+**工作流版本升级测试场景：**
+
+```python
+# tests/e2e/test_workflow_version_upgrade.py
+@pytest.mark.e2e
+async def test_old_task_uses_original_version():
+    """验证：旧任务在配置升级后继续使用原版本"""
+    # 1. 使用 v1 配置创建任务 A
+    task_a = await create_task(...)  # workflow_version = "v1"
+
+    # 2. 任务 A 运行到 manager_audit 节点（挂起）
+
+    # 3. 升级配置到 v2（新增 CTO 审批节点）
+    await upgrade_workflow_config("purchase_request", v2_config)
+
+    # 4. 创建新任务 B，应该使用 v2
+    task_b = await create_task(...)  # workflow_version = "v2"
+
+    # 5. 回调任务 A，应该继续用 v1 流程（无 CTO 审批）
+    await callback_task(task_a, ...)
+    assert task_a.status == "completed"  # v1 流程直接完成
+
+    # 6. 验证任务 B 使用 v2 流程（需要 CTO 审批）
+    await callback_task(task_b, manager_approval)
+    assert task_b.status == "awaiting_cto_audit"  # v2 特有节点
+```
+
+**测试验证点：**
+- 旧任务 `workflow_version` 字段保持不变
+- 旧任务回调后按原配置路径执行
+- 新任务使用最新配置版本
+- 配置升级不影响已运行任务的 checkpoint 状态
 
 ### 8.2 测试目录结构
 
