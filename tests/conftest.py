@@ -73,17 +73,15 @@ def message_bus(db: Database):
 def event_store(db: Database):
     """Return a SQLiteEventStore instance.
 
-    This fixture will be implemented in Task 6.
-
     Args:
         db: The database fixture.
 
     Returns:
         A SQLiteEventStore instance.
     """
-    # Will be: from app.infrastructure.event_store import SQLiteEventStore
-    # return SQLiteEventStore(db)
-    pytest.skip("event_store fixture will be implemented in Task 6")
+    from app.infrastructure.event_store import SQLiteEventStore
+
+    return SQLiteEventStore(db)
 
 
 @pytest.fixture
