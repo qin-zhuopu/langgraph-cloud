@@ -86,14 +86,12 @@ def event_store(db: Database):
 def workflow_repo(db: Database):
     """Return a SQLiteWorkflowRepo instance.
 
-    This fixture will be implemented in Task 8.
-
     Args:
         db: The database fixture.
 
     Returns:
         A SQLiteWorkflowRepo instance.
     """
-    # Will be: from app.infrastructure.workflow_repo import SQLiteWorkflowRepo
-    # return SQLiteWorkflowRepo(db)
-    pytest.skip("workflow_repo fixture will be implemented in Task 8")
+    from app.infrastructure.workflow_repo import SQLiteWorkflowRepo
+
+    return SQLiteWorkflowRepo(db)

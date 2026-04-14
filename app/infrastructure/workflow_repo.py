@@ -1,0 +1,126 @@
+"""SQLite workflow repository implementation for version management.
+
+This module provides workflow configuration version management using SQLite.
+"""
+import json
+from typing import Any, Optional
+
+import aiosqlite
+
+from app.domain.interfaces import IWorkflowRepo
+from app.infrastructure.database import Database
+
+
+class SQLiteWorkflowRepo(IWorkflowRepo):
+    """SQLite implementation of IWorkflowRepo for workflow version management.
+
+    This repository manages workflow configurations with version tracking,
+    allowing retrieval of active versions and specific version configurations.
+    """
+
+    def __init__(self, db: Database) -> None:
+        """Initialize the SQLiteWorkflowRepo.
+
+        Args:
+            db: The Database instance to use for connections.
+        """
+        self._db = db
+
+    async def get_active(self, workflow_name: str) -> Optional[dict[str, Any]]:
+        """Get the active version of a workflow.
+
+        Args:
+            workflow_name: The workflow name/identifier.
+
+        Returns:
+            The workflow config dict or None if not found.
+        """
+        async with aiosqlite.connect(self._db.db_path) as conn:
+            await self._db.init_tables(conn)
+
+            cursor = await conn.execute(
+                """
+                SELECT version, workflow_name, config, active
+                FROM workflow_versions
+                WHERE workflow_name = ? AND active = 1
+                ORDER BY created_at DESC
+                LIMIT 1
+                """,
+                (workflow_name,),
+            )
+            row = await cursor.fetchone()
+
+            if row is None:
+                return None
+
+            return {
+                "version": row[0],
+                "workflow_name": row[1],
+                "config": json.loads(row[2]) if row[2] else {},
+                "active": row[3] == 1,
+            }
+
+    async def get_by_version(
+        self, workflow_name: str, version: str
+    ) -> Optional[dict[str, Any]]:
+        """Get a specific version of a workflow.
+
+        Args:
+            workflow_name: The workflow name/identifier.
+            version: The version string (e.g., 'v1').
+
+        Returns:
+            The workflow config dict or None if not found.
+        """
+        async with aiosqlite.connect(self._db.db_path) as conn:
+            await self._db.init_tables(conn)
+
+            cursor = await conn.execute(
+                """
+                SELECT version, workflow_name, config, active
+                FROM workflow_versions
+                WHERE workflow_name = ? AND version = ?
+                """,
+                (workflow_name, version),
+            )
+            row = await cursor.fetchone()
+
+            if row is None:
+                return None
+
+            return {
+                "version": row[0],
+                "workflow_name": row[1],
+                "config": json.loads(row[2]) if row[2] else {},
+                "active": row[3] == 1,
+            }
+
+    async def save_version(
+        self,
+        version: str,
+        workflow_name: str,
+        config: dict[str, Any],
+        active: bool = True,
+    ) -> None:
+        """Save a workflow version.
+
+        Uses INSERT OR REPLACE to handle both new versions and updates
+        to existing versions.
+
+        Args:
+            version: The version string.
+            workflow_name: The workflow name/identifier.
+            config: The workflow configuration dict.
+            active: Whether this should be the active version.
+        """
+        async with aiosqlite.connect(self._db.db_path) as conn:
+            await self._db.init_tables(conn)
+
+            await conn.execute(
+                """
+                INSERT OR REPLACE INTO workflow_versions (version, workflow_name, config, active)
+                VALUES (?, ?, ?, ?)
+                """,
+                (version, workflow_name, json.dumps(config), 1 if active else 0),
+            )
+            await conn.commit()
