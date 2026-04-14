@@ -82,6 +82,7 @@ class Database:
                 thread_id TEXT NOT NULL,
                 checkpoint_id TEXT NOT NULL,
                 state TEXT NOT NULL,
+                metadata TEXT NOT NULL DEFAULT '{}',
                 created_at TEXT NOT NULL DEFAULT (datetime('now')),
                 PRIMARY KEY (thread_id, checkpoint_id)
             )
