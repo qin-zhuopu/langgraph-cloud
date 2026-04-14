@@ -105,7 +105,8 @@ class SQLiteWorkflowRepo(IWorkflowRepo):
         """Save a workflow version.
 
         Uses INSERT OR REPLACE to handle both new versions and updates
-        to existing versions.
+        to existing versions. When active=True, all other versions of the
+        same workflow are deactivated.
 
         Args:
             version: The version string.
@@ -115,6 +116,17 @@ class SQLiteWorkflowRepo(IWorkflowRepo):
         """
         async with aiosqlite.connect(self._db.db_path) as conn:
             await self._db.init_tables(conn)
+
+            # If setting this version as active, deactivate all other versions
+            if active:
+                await conn.execute(
+                    """
+                    UPDATE workflow_versions
+                    SET active = 0
+                    WHERE workflow_name = ?
+                    """,
+                    (workflow_name,),
+                )
 
             await conn.execute(
                 """
