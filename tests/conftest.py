@@ -56,17 +56,15 @@ def task_repo(db: Database):
 def message_bus(db: Database):
     """Return a SQLiteMessageBus instance.
 
-    This fixture will be implemented in Task 7.
-
     Args:
         db: The database fixture.
 
     Returns:
         A SQLiteMessageBus instance.
     """
-    # Will be: from app.infrastructure.message_bus import SQLiteMessageBus
-    # return SQLiteMessageBus(db)
-    pytest.skip("message_bus fixture will be implemented in Task 7")
+    from app.infrastructure.sqlite_bus import SQLiteMessageBus
+
+    return SQLiteMessageBus(db)
 
 
 @pytest.fixture
