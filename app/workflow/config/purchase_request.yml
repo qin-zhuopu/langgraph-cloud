@@ -1,0 +1,49 @@
+name: purchase_request
+display_name: 采购申请审批流程
+
+nodes:
+  - id: submit
+    type: action
+    display_name: 提交申请
+    description: 用户提交采购申请
+    next: manager_audit
+
+  - id: manager_audit
+    type: interrupt
+    display_name: 经理审批
+    description: 部门经理审批采购申请
+    required_params:
+      - is_approved
+      - audit_opinion
+      - approver
+    transitions:
+      - condition: is_approved == true
+        next: finance_audit
+      - condition: is_approved == false
+        next: rejected
+
+  - id: finance_audit
+    type: interrupt
+    display_name: 财务审批
+    description: 财务部门审批采购申请
+    required_params:
+      - is_approved
+      - audit_opinion
+      - approver
+    transitions:
+      - condition: is_approved == true
+        next: approved
+      - condition: is_approved == false
+        next: rejected
+
+  - id: approved
+    type: terminal
+    display_name: 审批通过
+    description: 采购申请已通过所有审批
+    status: completed
+
+  - id: rejected
+    type: terminal
+    display_name: 审批拒绝
+    description: 采购申请被拒绝
+    status: rejected
