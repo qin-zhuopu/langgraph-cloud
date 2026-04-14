@@ -391,6 +391,15 @@ nodes:
 - 配置更新不影响已运行的任务
 - 新任务使用最新版本
 
+**MVP 版本升级流程：**
+
+1. 停止服务器
+2. 修改 YAML 配置文件
+3. 重启服务器（加载新配置）
+4. 新任务自动使用最新版本
+
+> **注意**：MVP 期间不支持热重载，配置变更需要重启服务。
+
 ---
 
 ## 7. 错误处理
@@ -415,38 +424,44 @@ nodes:
 2. **test_polling_mode.py** - 轮询模式完整流程（Fallback）
 3. **test_workflow_version_upgrade.py** - 工作流版本升级场景
 
-**工作流版本升级测试场景：**
+**工作流版本升级测试场景（MVP 模拟方案）：**
 
 ```python
 # tests/e2e/test_workflow_version_upgrade.py
 @pytest.mark.e2e
-async def test_old_task_uses_original_version():
-    """验证：旧任务在配置升级后继续使用原版本"""
+async def test_workflow_version_isolation():
+    """验证：不同版本的任务互不影响（无需重启服务器）"""
     # 1. 使用 v1 配置创建任务 A
-    task_a = await create_task(...)  # workflow_version = "v1"
+    task_a = await create_task_with_version("v1")
 
     # 2. 任务 A 运行到 manager_audit 节点（挂起）
 
-    # 3. 升级配置到 v2（新增 CTO 审批节点）
-    await upgrade_workflow_config("purchase_request", v2_config)
+    # 3. 直接插入 v2 配置到数据库（模拟升级）
+    await insert_workflow_version("v2", v2_config, active=True)
 
-    # 4. 创建新任务 B，应该使用 v2
-    task_b = await create_task(...)  # workflow_version = "v2"
+    # 4. 创建新任务 B，应该自动使用 v2
+    task_b = await create_task()  # workflow_version = "v2"
 
-    # 5. 回调任务 A，应该继续用 v1 流程（无 CTO 审批）
-    await callback_task(task_a, ...)
+    # 5. 验证版本隔离
+    assert task_a.workflow_version == "v1"
+    assert task_b.workflow_version == "v2"
+
+    # 6. 回调任务 A，应继续用 v1 流程（无 CTO 审批）
+    await callback_task(task_a, manager_approval)
     assert task_a.status == "completed"  # v1 流程直接完成
 
-    # 6. 验证任务 B 使用 v2 流程（需要 CTO 审批）
+    # 7. 验证任务 B 使用 v2 流程（需要 CTO 审批）
     await callback_task(task_b, manager_approval)
     assert task_b.status == "awaiting_cto_audit"  # v2 特有节点
 ```
 
 **测试验证点：**
 - 旧任务 `workflow_version` 字段保持不变
-- 旧任务回调后按原配置路径执行
-- 新任务使用最新配置版本
-- 配置升级不影响已运行任务的 checkpoint 状态
+- 新任务自动获取最新版本
+- 不同版本的任务按各自配置路径执行
+- 版本间互不干扰
+
+**注**：MVP 期间使用模拟方案（直接插入数据库），避免真实服务器重启的复杂性。
 
 ### 8.2 测试目录结构
 
