@@ -34,3 +34,7 @@ packages = ["app"]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 pythonpath = ["."]
+markers = [
+    "e2e: End-to-end tests that test the complete workflow",
+    "integration: Integration tests for component interactions",
+]
