@@ -1,0 +1,77 @@
+name: inquiry
+display_name: 询价任务
+description: 询价单从创建到ERP导入的完整工作流
+
+nodes:
+  - id: create_inquiry
+    type: action
+    display_name: 创建询价单
+    description: 根据已确认的物料和供应商数据创建询价单
+    target_node: send_inquiry
+
+  - id: send_inquiry
+    type: action
+    display_name: 发送询价
+    description: 通过SMTP向所有供应商发送询价邮件
+    target_node: check_quotes
+
+  - id: check_quotes
+    type: interrupt
+    display_name: 报价检查点
+    description: 补录报价、查看对比表、决策继续询价或定标
+    transitions:
+      - action: new_round
+        label: 继续询价
+        target_node: send_inquiry
+        condition: action == "new_round"
+        form_schema:
+          type: object
+          required: [new_deadline, supplier_codes]
+          properties:
+            new_deadline:
+              type: string
+              format: date-time
+              description: 新一轮报价截止时间，必须晚于当前时间
+            supplier_codes:
+              type: array
+              items:
+                type: string
+              minItems: 1
+              description: 参与下一轮询价的供应商编码列表
+      - action: award
+        label: 定标
+        target_node: push_to_erp
+        condition: action == "award"
+        form_schema:
+          type: object
+          required: [winners]
+          properties:
+            winners:
+              type: array
+              minItems: 1
+              description: 中标结果（物料×供应商×价格）
+              items:
+                type: object
+                required: [material_code, supplier_code, awarded_price]
+                properties:
+                  material_code:
+                    type: string
+                    description: 物料编码
+                  supplier_code:
+                    type: string
+                    description: 中标供应商编码
+                  awarded_price:
+                    type: number
+                    description: 中标价格
+
+  - id: push_to_erp
+    type: action
+    display_name: 导入ERP
+    description: 报价数据和中标结果导入Oracle EBS
+    target_node: completed
+
+  - id: completed
+    type: terminal
+    display_name: 已完成
+    description: 询价单完成
+    status: completed

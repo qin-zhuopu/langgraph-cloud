@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Implement the inquiry (询价) workflow with 1 interrupt node (check_quotes), 2 branches (new_round / push_erp), YAML config, unit tests (mocked action nodes), and integration tests (real SQLite DB).
+**Goal:** Implement the inquiry (询价) workflow with 1 interrupt node (check_quotes), 2 branches (new_round / award), YAML config, unit tests (mocked action nodes), and integration tests (real SQLite DB).
 
 **Architecture:** Follow existing patterns: YAML config → WorkflowBuilder → WorkflowExecutor. New YAML config in `app/workflow/config/inquiry.yml`. Action nodes (`create_inquiry`, `send_inquiry`, `push_to_erp`) are mocked in unit tests. Integration tests use real SQLite with mocked external dependencies (SMTP, Oracle EBS).
 
@@ -44,18 +44,18 @@ nodes:
     type: action
     display_name: 创建询价单
     description: 根据已确认的物料和供应商数据创建询价单
-    next: send_inquiry
+    target_node: send_inquiry
 
   - id: send_inquiry
     type: action
     display_name: 发送询价
     description: 通过SMTP向所有供应商发送询价邮件
-    next: check_quotes
+    target_node: check_quotes
 
   - id: check_quotes
     type: interrupt
     display_name: 报价检查点
-    description: 补录报价、查看对比表、决策继续询价或导入ERP
+    description: 补录报价、查看对比表、决策继续询价或定标
     transitions:
       - action: new_round
         label: 继续询价
@@ -63,73 +63,49 @@ nodes:
         condition: action == "new_round"
         form_schema:
           type: object
-          required: [new_deadline]
+          required: [new_deadline, supplier_codes]
           properties:
             new_deadline:
               type: string
               format: date-time
               description: 新一轮报价截止时间，必须晚于当前时间
-      - action: push_erp
-        label: 导入ERP
+            supplier_codes:
+              type: array
+              items:
+                type: string
+              minItems: 1
+              description: 参与下一轮询价的供应商编码列表
+      - action: award
+        label: 定标
         target_node: push_to_erp
-        condition: action == "push_erp"
+        condition: action == "award"
         form_schema:
           type: object
-          required: [quotes, winners]
+          required: [winners]
           properties:
-            quotes:
-              type: array
-              description: 各供应商报价数据（含补录）
-              items:
-                type: object
-                required: [supplier_id, items]
-                properties:
-                  supplier_id:
-                    type: string
-                    description: 供应商编码
-                  items:
-                    type: array
-                    items:
-                      type: object
-                      required: [material_code, unit_price_tax_incl, tax_rate, currency]
-                      properties:
-                        material_code:
-                          type: string
-                          description: 物料编码
-                        unit_price_tax_incl:
-                          type: number
-                          description: 含税单价
-                        tax_rate:
-                          type: number
-                          description: 税率
-                        currency:
-                          type: string
-                          description: 币种
-                        delivery_period:
-                          type: string
-                          description: 交货期
-                        remark:
-                          type: string
-                          description: 备注
             winners:
               type: array
-              description: 中标供应商及对应物料（按物料维度，支持部分中标）
+              minItems: 1
+              description: 中标结果（物料×供应商×价格）
               items:
                 type: object
-                required: [supplier_id, material_code]
+                required: [material_code, supplier_code, awarded_price]
                 properties:
-                  supplier_id:
-                    type: string
-                    description: 中标供应商编码
                   material_code:
                     type: string
-                    description: 中标物料编码
+                    description: 物料编码
+                  supplier_code:
+                    type: string
+                    description: 中标供应商编码
+                  awarded_price:
+                    type: number
+                    description: 中标价格
 
   - id: push_to_erp
     type: action
     display_name: 导入ERP
     description: 报价数据和中标结果导入Oracle EBS
-    next: completed
+    target_node: completed
 
   - id: completed
     type: terminal
@@ -231,7 +207,7 @@ class TestInquiryWorkflowBuild:
         targets = {t["action"]: t["target_node"] for t in check_quotes["transitions"]}
 
         assert targets["new_round"] == "send_inquiry"
-        assert targets["push_erp"] == "push_to_erp"
+        assert targets["award"] == "push_to_erp"
 
     def test_interrupt_node_ids(self):
         """Test get_interrupt_node_ids returns check_quotes."""
@@ -278,11 +254,11 @@ Append to `TestInquiryWorkflowBuild`:
         )
         assert result is True
 
-    def test_condition_routing_push_erp(self):
-        """Test action=='push_erp' routes to push_to_erp."""
+    def test_condition_routing_award(self):
+        """Test action=='award' routes to push_to_erp."""
         config = WorkflowBuilder.load_config("inquiry")
         result = WorkflowBuilder._evaluate_condition(
-            "action == \"push_erp\"", {"action": "push_erp"}
+            "action == \"award\"", {"action": "award"}
         )
         assert result is True
 
@@ -321,8 +297,8 @@ Append a new class:
 class TestInquiryFormSchema:
     """Tests for interrupt node form_schema correctness."""
 
-    def test_new_round_schema_requires_deadline(self):
-        """Test new_round form_schema requires new_deadline."""
+    def test_new_round_schema_requires_deadline_and_suppliers(self):
+        """Test new_round form_schema requires new_deadline and supplier_codes."""
         config = WorkflowBuilder.load_config("inquiry")
         check_quotes = next(
             n for n in config["nodes"] if n["id"] == "check_quotes"
@@ -333,56 +309,35 @@ class TestInquiryFormSchema:
         schema = new_round["form_schema"]
 
         assert "new_deadline" in schema["required"]
+        assert "supplier_codes" in schema["required"]
 
-    def test_push_erp_schema_requires_quotes_and_winners(self):
-        """Test push_erp form_schema requires quotes and winners."""
+    def test_award_schema_requires_winners(self):
+        """Test award form_schema requires winners."""
         config = WorkflowBuilder.load_config("inquiry")
         check_quotes = next(
             n for n in config["nodes"] if n["id"] == "check_quotes"
         )
-        push_erp = next(
-            t for t in check_quotes["transitions"] if t["action"] == "push_erp"
+        award = next(
+            t for t in check_quotes["transitions"] if t["action"] == "award"
         )
-        schema = push_erp["form_schema"]
+        schema = award["form_schema"]
 
-        assert "quotes" in schema["required"]
         assert "winners" in schema["required"]
 
-    def test_push_erp_quotes_schema_structure(self):
-        """Test push_erp quotes has correct nested structure."""
+    def test_award_winners_schema_structure(self):
+        """Test award winners requires material_code, supplier_code, awarded_price."""
         config = WorkflowBuilder.load_config("inquiry")
         check_quotes = next(
             n for n in config["nodes"] if n["id"] == "check_quotes"
         )
-        push_erp = next(
-            t for t in check_quotes["transitions"] if t["action"] == "push_erp"
+        award = next(
+            t for t in check_quotes["transitions"] if t["action"] == "award"
         )
-        quotes_prop = push_erp["form_schema"]["properties"]["quotes"]
+        winner_schema = award["form_schema"]["properties"]["winners"]["items"]
 
-        assert quotes_prop["type"] == "array"
-        item_props = quotes_prop["items"]["properties"]
-        assert "supplier_id" in item_props
-        assert "items" in item_props
-        material_props = item_props["items"]["items"]["properties"]
-        assert "material_code" in material_props
-        assert "unit_price_tax_incl" in material_props
-        assert "tax_rate" in material_props
-        assert "currency" in material_props
-
-    def test_push_erp_winners_schema_structure(self):
-        """Test push_erp winners has supplier_id and material_code."""
-        config = WorkflowBuilder.load_config("inquiry")
-        check_quotes = next(
-            n for n in config["nodes"] if n["id"] == "check_quotes"
-        )
-        push_erp = next(
-            t for t in check_quotes["transitions"] if t["action"] == "push_erp"
-        )
-        winner_props = push_erp["form_schema"]["properties"]["winners"]
-
-        assert winner_props["type"] == "array"
-        assert "supplier_id" in winner_props["items"]["required"]
-        assert "material_code" in winner_props["items"]["required"]
+        assert "material_code" in winner_schema["required"]
+        assert "supplier_code" in winner_schema["required"]
+        assert "awarded_price" in winner_schema["required"]
 
     def test_validate_new_round_with_valid_data(self):
         """Test new_round form accepts valid data against JSON Schema."""
@@ -396,11 +351,14 @@ class TestInquiryFormSchema:
         )
         schema = new_round["form_schema"]
 
-        valid_data = {"new_deadline": "2026-05-01T18:00:00"}
+        valid_data = {
+            "new_deadline": "2026-05-15T18:00:00",
+            "supplier_codes": ["SUP_JINGLIN", "SUP_DEXIN", "SUP_SHIYI", "SUP_TONGZHOU"],
+        }
         jsonschema.validate(valid_data, schema)  # Should not raise
 
-    def test_validate_new_round_missing_deadline(self):
-        """Test new_round form rejects missing new_deadline."""
+    def test_validate_new_round_missing_supplier_codes(self):
+        """Test new_round form rejects missing supplier_codes."""
         import jsonschema
         config = WorkflowBuilder.load_config("inquiry")
         check_quotes = next(
@@ -412,54 +370,75 @@ class TestInquiryFormSchema:
         schema = new_round["form_schema"]
 
         with pytest.raises(jsonschema.ValidationError):
-            jsonschema.validate({}, schema)
+            jsonschema.validate({"new_deadline": "2026-05-15T18:00:00"}, schema)
 
-    def test_validate_push_erp_with_valid_data(self):
-        """Test push_erp form accepts valid data against JSON Schema."""
+    def test_validate_new_round_empty_supplier_codes(self):
+        """Test new_round form rejects empty supplier_codes array."""
         import jsonschema
         config = WorkflowBuilder.load_config("inquiry")
         check_quotes = next(
             n for n in config["nodes"] if n["id"] == "check_quotes"
         )
-        push_erp = next(
-            t for t in check_quotes["transitions"] if t["action"] == "push_erp"
+        new_round = next(
+            t for t in check_quotes["transitions"] if t["action"] == "new_round"
         )
-        schema = push_erp["form_schema"]
+        schema = new_round["form_schema"]
+
+        with pytest.raises(jsonschema.ValidationError):
+            jsonschema.validate({"new_deadline": "2026-05-15T18:00:00", "supplier_codes": []}, schema)
+
+    def test_validate_award_with_valid_data(self):
+        """Test award form accepts valid data against JSON Schema."""
+        import jsonschema
+        config = WorkflowBuilder.load_config("inquiry")
+        check_quotes = next(
+            n for n in config["nodes"] if n["id"] == "check_quotes"
+        )
+        award = next(
+            t for t in check_quotes["transitions"] if t["action"] == "award"
+        )
+        schema = award["form_schema"]
 
         valid_data = {
-            "quotes": [
-                {
-                    "supplier_id": "SUP_001",
-                    "items": [
-                        {
-                            "material_code": "MAT_001",
-                            "unit_price_tax_incl": 1050.0,
-                            "tax_rate": 0.13,
-                            "currency": "CNY"
-                        }
-                    ]
-                }
-            ],
             "winners": [
-                {"supplier_id": "SUP_001", "material_code": "MAT_001"}
+                {"material_code": "C050066547", "supplier_code": "SUP_JINGLIN", "awarded_price": 1050.0},
+                {"material_code": "C050086211", "supplier_code": "SUP_DEXIN", "awarded_price": 2200.0},
+                {"material_code": "C050099301", "supplier_code": "SUP_JINGLIN", "awarded_price": 680.0},
             ]
         }
         jsonschema.validate(valid_data, schema)  # Should not raise
 
-    def test_validate_push_erp_missing_quotes(self):
-        """Test push_erp form rejects missing quotes."""
+    def test_validate_award_missing_winners(self):
+        """Test award form rejects missing winners."""
         import jsonschema
         config = WorkflowBuilder.load_config("inquiry")
         check_quotes = next(
             n for n in config["nodes"] if n["id"] == "check_quotes"
         )
-        push_erp = next(
-            t for t in check_quotes["transitions"] if t["action"] == "push_erp"
+        award = next(
+            t for t in check_quotes["transitions"] if t["action"] == "award"
         )
-        schema = push_erp["form_schema"]
+        schema = award["form_schema"]
 
         with pytest.raises(jsonschema.ValidationError):
-            jsonschema.validate({"winners": []}, schema)
+            jsonschema.validate({}, schema)
+
+    def test_validate_award_winner_missing_price(self):
+        """Test award form rejects winner without awarded_price."""
+        import jsonschema
+        config = WorkflowBuilder.load_config("inquiry")
+        check_quotes = next(
+            n for n in config["nodes"] if n["id"] == "check_quotes"
+        )
+        award = next(
+            t for t in check_quotes["transitions"] if t["action"] == "award"
+        )
+        schema = award["form_schema"]
+
+        with pytest.raises(jsonschema.ValidationError):
+            jsonschema.validate({
+                "winners": [{"material_code": "C050066547", "supplier_code": "SUP_JINGLIN"}]
+            }, schema)
 ```
 
 - [ ] **Step 2: Run tests**
@@ -476,25 +455,20 @@ git commit -m "test(unit): add inquiry form_schema validation tests"
 
 ---
 
-### Task 5: Integration Tests — Normal Flow (push_erp)
+### Task 5: Integration Tests — Normal Flow (award)
 
 **Files:**
 - Create: `tests/integration/test_inquiry_workflow.py`
 
-- [ ] **Step 1: Write integration test for direct push_erp flow**
+- [ ] **Step 1: Write integration test for direct award flow**
 
 ```python
 """Integration tests for inquiry workflow with real SQLite database."""
 import pytest
 
+from app.infrastructure.workflow_repo import SQLiteWorkflowRepo
 from app.service.task_service import TaskService
 from app.workflow.builder import WorkflowBuilder
-
-
-@pytest.fixture
-def inquiry_service(task_service):
-    """TaskService instance for inquiry workflow tests."""
-    return task_service
 
 
 @pytest.fixture
@@ -503,70 +477,107 @@ def inquiry_config():
     return WorkflowBuilder.load_config("inquiry")
 
 
+@pytest.fixture
+async def inquiry_workflow(db, workflow_repo: SQLiteWorkflowRepo, inquiry_config):
+    """Register inquiry workflow config in the database."""
+    await workflow_repo.save_version("v1", "inquiry", inquiry_config, active=True)
+    yield "inquiry"
+
+
+@pytest.fixture
+def inquiry_service(
+    task_repo, message_bus, event_store, workflow_repo,
+) -> TaskService:
+    """TaskService instance for inquiry workflow tests."""
+    from app.workflow.executor import WorkflowExecutor
+    builder = WorkflowBuilder()
+    executor = WorkflowExecutor(message_bus)
+    return TaskService(
+        task_repo=task_repo,
+        message_bus=message_bus,
+        event_store=event_store,
+        workflow_repo=workflow_repo,
+        builder=builder,
+        executor=executor,
+    )
+
+
+MOCK_TASK_DATA = {
+    "title": "自动化控制设备采购询价",
+    "business_entity": "杰瑞集团",
+    "deadline": "2026-05-01T18:00:00",
+    "template_id": "TPL_AUTO_CTRL",
+    "is_annual": False,
+    "materials": [
+        {"material_code": "C050066547", "material_desc": "8路模拟量输出模块", "quantity": 10, "unit": "个", "need_date": "2026-05-15", "category_l4": "自动化控制"},
+        {"material_code": "C050086211", "material_desc": "高速计数模块", "quantity": 5, "unit": "个", "need_date": "2026-05-15", "category_l4": "自动化控制"},
+        {"material_code": "C050099301", "material_desc": "工业以太网交换机", "quantity": 20, "unit": "台", "need_date": "2026-05-20", "category_l4": "网络设备"},
+    ],
+    "suppliers": [
+        {"supplier_code": "SUP_JINGLIN", "supplier_name": "河北京霖拖链技术有限公司", "contact_name": "王经理", "email": "wang@jinglin.com", "source": "group_match"},
+        {"supplier_code": "SUP_DEXIN", "supplier_name": "河南德信安全科技有限公司", "contact_name": "李工", "email": "li@dexin.com", "source": "group_match"},
+        {"supplier_code": "SUP_SHIYI", "supplier_name": "山东拾一科技服务有限公司", "contact_name": "张总", "email": "zhang@shiyi.com", "source": "manual"},
+        {"supplier_code": "SUP_TONGZHOU", "supplier_name": "北京同洲维普科技有限公司", "contact_name": "赵经理", "email": "zhao@tongzhou.com", "source": "ai_recommend"},
+        {"supplier_code": "SUP_WANSHAN", "supplier_name": "深圳市万山文创有限公司", "contact_name": "陈总", "email": "chen@wanshan.com", "source": "ai_recommend"},
+    ],
+}
+
+
 class TestInquiryNormalFlow:
-    """Test the normal inquiry flow: create → check_quotes → push_erp → completed."""
+    """Test the normal inquiry flow: create → check_quotes → award → completed."""
 
     @pytest.mark.asyncio
     async def test_create_inquiry_task_interrupts_at_check_quotes(
-        self, inquiry_service, inquiry_config
+        self, db, inquiry_service, inquiry_workflow,
     ):
         """Creating an inquiry task should interrupt at check_quotes node."""
-        task = await inquiry_service.create(
+        task = await inquiry_service.create_task(
             user_id="test_user",
             task_type="inquiry",
-            data={"materials": ["MAT_001"], "suppliers": ["SUP_001"]},
+            data=MOCK_TASK_DATA,
         )
 
         assert task["id"] is not None
-        assert task["status"] == "interrupted"
+        assert task["status"] == "awaiting_check_quotes"
 
-        # Verify pending_callback points to check_quotes
-        assert task["data"]["pending_callback"]["node_id"] == "check_quotes"
-        assert task["data"]["pending_callback"]["event_id"] is not None
+        # pending_callback is a top-level field on the task dict
+        assert task["pending_callback"] is not None
+        assert task["pending_callback"]["node_id"] == "check_quotes"
+        assert task["pending_callback"]["event_id"] is not None
 
     @pytest.mark.asyncio
-    async def test_push_erp_completes_workflow(
-        self, inquiry_service, inquiry_config
+    async def test_award_completes_workflow(
+        self, db, inquiry_service, inquiry_workflow,
     ):
-        """Callback with push_erp should complete the workflow."""
+        """Callback with award should complete the workflow."""
         # Create task (interrupts at check_quotes)
-        task = await inquiry_service.create(
+        task = await inquiry_service.create_task(
             user_id="test_user",
             task_type="inquiry",
-            data={"materials": ["MAT_001"], "suppliers": ["SUP_001"]},
+            data=MOCK_TASK_DATA,
         )
         task_id = task["id"]
-        event_id = task["data"]["pending_callback"]["event_id"]
-        node_id = task["data"]["pending_callback"]["node_id"]
+        event_id = task["pending_callback"]["event_id"]
+        node_id = task["pending_callback"]["node_id"]
 
-        # Callback with push_erp branch
+        # Callback with award branch
         result = await inquiry_service.callback(
             task_id=task_id,
             event_id=event_id,
             node_id=node_id,
+            action="award",
             user_input={
-                "action": "push_erp",
-                "quotes": [
-                    {
-                        "supplier_id": "SUP_001",
-                        "items": [
-                            {
-                                "material_code": "MAT_001",
-                                "unit_price_tax_incl": 1050.0,
-                                "tax_rate": 0.13,
-                                "currency": "CNY",
-                            }
-                        ],
-                    }
-                ],
                 "winners": [
-                    {"supplier_id": "SUP_001", "material_code": "MAT_001"}
+                    {"material_code": "C050066547", "supplier_code": "SUP_JINGLIN", "awarded_price": 1050.0},
+                    {"material_code": "C050086211", "supplier_code": "SUP_DEXIN", "awarded_price": 2200.0},
+                    {"material_code": "C050099301", "supplier_code": "SUP_JINGLIN", "awarded_price": 680.0},
                 ],
             },
         )
 
         # Verify workflow completed
         assert result["status"] == "completed"
+        assert result["pending_callback"] is None
 
         # Verify final task state in DB
         final_task = await inquiry_service.get_task(task_id)
@@ -601,90 +612,82 @@ git commit -m "test(integration): add inquiry normal flow tests"
 
 ```python
 class TestInquiryMultiRound:
-    """Test multi-round inquiry flow: new_round → check_quotes → push_erp."""
+    """Test multi-round inquiry flow: new_round → check_quotes → award."""
 
     @pytest.mark.asyncio
     async def test_new_round_loops_back_to_interrupt(
-        self, inquiry_service, inquiry_config
+        self, db, inquiry_service, inquiry_workflow,
     ):
         """Callback with new_round should re-interrupt at check_quotes."""
         # Create task
-        task = await inquiry_service.create(
+        task = await inquiry_service.create_task(
             user_id="test_user",
             task_type="inquiry",
-            data={"materials": ["MAT_001"], "suppliers": ["SUP_001"]},
+            data=MOCK_TASK_DATA,
         )
         task_id = task["id"]
-        event_id = task["data"]["pending_callback"]["event_id"]
-        node_id = task["data"]["pending_callback"]["node_id"]
+        event_id = task["pending_callback"]["event_id"]
+        node_id = task["pending_callback"]["node_id"]
 
-        # First callback: new_round
+        # First callback: new_round — eliminate 万山, keep 4 suppliers
         result = await inquiry_service.callback(
             task_id=task_id,
             event_id=event_id,
             node_id=node_id,
+            action="new_round",
             user_input={
-                "action": "new_round",
-                "new_deadline": "2026-06-01T18:00:00",
+                "new_deadline": "2026-05-15T18:00:00",
+                "supplier_codes": ["SUP_JINGLIN", "SUP_DEXIN", "SUP_SHIYI", "SUP_TONGZHOU"],
             },
         )
 
-        assert result["status"] == "interrupted"
+        assert result["status"] == "awaiting_check_quotes"
 
-        # Verify new event_id (different from first)
-        new_event_id = result["data"]["pending_callback"]["event_id"]
+        # Verify new pending_callback with different event_id
+        assert result["pending_callback"] is not None
+        new_event_id = result["pending_callback"]["event_id"]
         assert new_event_id != event_id
 
     @pytest.mark.asyncio
-    async def test_two_rounds_then_push_erp(
-        self, inquiry_service, inquiry_config
+    async def test_two_rounds_then_award(
+        self, db, inquiry_service, inquiry_workflow,
     ):
-        """Full multi-round flow: create → new_round → push_erp → completed."""
-        # Create task
-        task = await inquiry_service.create(
+        """Full multi-round flow: create → new_round → award → completed."""
+        # Create task with 5 suppliers
+        task = await inquiry_service.create_task(
             user_id="test_user",
             task_type="inquiry",
-            data={"materials": ["MAT_001"], "suppliers": ["SUP_001"]},
+            data=MOCK_TASK_DATA,
         )
         task_id = task["id"]
 
-        # Round 1: new_round
-        event_id_1 = task["data"]["pending_callback"]["event_id"]
-        node_id = task["data"]["pending_callback"]["node_id"]
+        # Round 1: new_round — eliminate 万山
+        event_id_1 = task["pending_callback"]["event_id"]
+        node_id = task["pending_callback"]["node_id"]
         result = await inquiry_service.callback(
             task_id=task_id,
             event_id=event_id_1,
             node_id=node_id,
+            action="new_round",
             user_input={
-                "action": "new_round",
-                "new_deadline": "2026-06-01T18:00:00",
+                "new_deadline": "2026-05-15T18:00:00",
+                "supplier_codes": ["SUP_JINGLIN", "SUP_DEXIN", "SUP_SHIYI", "SUP_TONGZHOU"],
             },
         )
-        assert result["status"] == "interrupted"
+        assert result["status"] == "awaiting_check_quotes"
 
-        # Round 2: push_erp
-        event_id_2 = result["data"]["pending_callback"]["event_id"]
+        # Round 2: award — select winners per material
+        event_id_2 = result["pending_callback"]["event_id"]
         result = await inquiry_service.callback(
             task_id=task_id,
             event_id=event_id_2,
             node_id=node_id,
+            action="award",
             user_input={
-                "action": "push_erp",
-                "quotes": [
-                    {
-                        "supplier_id": "SUP_001",
-                        "items": [
-                            {
-                                "material_code": "MAT_001",
-                                "unit_price_tax_incl": 1000.0,
-                                "tax_rate": 0.13,
-                                "currency": "CNY",
-                            }
-                        ],
-                    }
-                ],
                 "winners": [
-                    {"supplier_id": "SUP_001", "material_code": "MAT_001"}
+                    {"material_code": "C050066547", "supplier_code": "SUP_JINGLIN", "awarded_price": 1050.0},
+                    {"material_code": "C050086211", "supplier_code": "SUP_DEXIN", "awarded_price": 2200.0},
+                    {"material_code": "C050099301", "supplier_code": "SUP_JINGLIN", "awarded_price": 680.0},
                 ],
             },
         )
@@ -706,7 +709,7 @@ git commit -m "test(integration): add multi-round inquiry tests"
 
 ---
 
-### Task 7: Integration Tests — Event Idempotency
+### Task 7: Integration Tests — Event Idempotency & Validation
 
 **Files:**
 - Modify: `tests/integration/test_inquiry_workflow.py`
@@ -718,25 +721,26 @@ class TestInquiryEventIdempotency:
     """Test event_id replay protection for inquiry workflow."""
 
     @pytest.mark.asyncio
-    async def test_duplicate_callback_rejected(self, inquiry_service):
+    async def test_duplicate_callback_rejected(self, db, inquiry_service, inquiry_workflow):
         """Second callback with same event_id should fail."""
-        task = await inquiry_service.create(
+        task = await inquiry_service.create_task(
             user_id="test_user",
             task_type="inquiry",
-            data={"materials": ["MAT_001"], "suppliers": ["SUP_001"]},
+            data=MOCK_TASK_DATA,
         )
         task_id = task["id"]
-        event_id = task["data"]["pending_callback"]["event_id"]
-        node_id = task["data"]["pending_callback"]["node_id"]
+        event_id = task["pending_callback"]["event_id"]
+        node_id = task["pending_callback"]["node_id"]
 
         # First callback succeeds
         await inquiry_service.callback(
             task_id=task_id,
             event_id=event_id,
             node_id=node_id,
+            action="new_round",
             user_input={
-                "action": "new_round",
                 "new_deadline": "2026-06-01T18:00:00",
+                "supplier_codes": ["SUP_JINGLIN", "SUP_DEXIN"],
             },
         )
 
@@ -746,24 +750,120 @@ class TestInquiryEventIdempotency:
                 task_id=task_id,
                 event_id=event_id,
                 node_id=node_id,
+                action="award",
                 user_input={
-                    "action": "push_erp",
-                    "quotes": [],
-                    "winners": [],
+                    "winners": [
+                        {"material_code": "C050066547", "supplier_code": "SUP_JINGLIN", "awarded_price": 1050.0},
+                    ],
                 },
             )
 ```
 
-- [ ] **Step 2: Run test**
+- [ ] **Step 2: Add callback validation tests**
 
-Run: `pytest tests/integration/test_inquiry_workflow.py::TestInquiryEventIdempotency -v`
+```python
+class TestInquiryCallbackValidation:
+    """Test callback action and form_schema validation at service level."""
+
+    @pytest.mark.asyncio
+    async def test_invalid_action_rejected(self, db, inquiry_service, inquiry_workflow):
+        """Callback with unknown action should raise ValueError."""
+        task = await inquiry_service.create_task(
+            user_id="test_user",
+            task_type="inquiry",
+            data=MOCK_TASK_DATA,
+        )
+        event_id = task["pending_callback"]["event_id"]
+
+        with pytest.raises(ValueError, match="Invalid action"):
+            await inquiry_service.callback(
+                task_id=task["id"],
+                event_id=event_id,
+                node_id="check_quotes",
+                action="cancel",
+                user_input={},
+            )
+
+    @pytest.mark.asyncio
+    async def test_new_round_missing_supplier_codes_rejected(self, db, inquiry_service, inquiry_workflow):
+        """new_round callback without supplier_codes should raise ValueError."""
+        task = await inquiry_service.create_task(
+            user_id="test_user",
+            task_type="inquiry",
+            data=MOCK_TASK_DATA,
+        )
+        event_id = task["pending_callback"]["event_id"]
+
+        with pytest.raises(ValueError, match="validation failed"):
+            await inquiry_service.callback(
+                task_id=task["id"],
+                event_id=event_id,
+                node_id="check_quotes",
+                action="new_round",
+                user_input={"new_deadline": "2026-06-01T18:00:00"},
+            )
+
+    @pytest.mark.asyncio
+    async def test_award_missing_winners_rejected(self, db, inquiry_service, inquiry_workflow):
+        """award callback without winners should raise ValueError."""
+        task = await inquiry_service.create_task(
+            user_id="test_user",
+            task_type="inquiry",
+            data=MOCK_TASK_DATA,
+        )
+        event_id = task["pending_callback"]["event_id"]
+
+        with pytest.raises(ValueError, match="validation failed"):
+            await inquiry_service.callback(
+                task_id=task["id"],
+                event_id=event_id,
+                node_id="check_quotes",
+                action="award",
+                user_input={},
+            )
+
+    @pytest.mark.asyncio
+    async def test_award_winner_missing_price_rejected(self, db, inquiry_service, inquiry_workflow):
+        """award callback with winner missing awarded_price should raise ValueError."""
+        task = await inquiry_service.create_task(
+            user_id="test_user",
+            task_type="inquiry",
+            data=MOCK_TASK_DATA,
+        )
+        event_id = task["pending_callback"]["event_id"]
+
+        with pytest.raises(ValueError, match="validation failed"):
+            await inquiry_service.callback(
+                task_id=task["id"],
+                event_id=event_id,
+                node_id="check_quotes",
+                action="award",
+                user_input={
+                    "winners": [{"material_code": "C050066547", "supplier_code": "SUP_JINGLIN"}],
+                },
+            )
+
+    @pytest.mark.asyncio
+    async def test_workflow_not_found_rejected(self, db, inquiry_service):
+        """Creating task with unknown workflow type should raise ValueError."""
+        with pytest.raises(ValueError, match="Workflow not found"):
+            await inquiry_service.create_task(
+                user_id="test_user",
+                task_type="nonexistent_workflow",
+                data={},
+            )
+```
+
+- [ ] **Step 3: Run tests**
+
+Run: `pytest tests/integration/test_inquiry_workflow.py::TestInquiryEventIdempotency tests/integration/test_inquiry_workflow.py::TestInquiryCallbackValidation -v`
 Expected: ALL PASS
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
 git add tests/integration/test_inquiry_workflow.py
-git commit -m "test(integration): add inquiry event idempotency test"
+git commit -m "test(integration): add inquiry idempotency and validation tests"
 ```
 
 ---
