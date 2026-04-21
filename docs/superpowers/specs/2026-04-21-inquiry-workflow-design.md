@@ -165,3 +165,59 @@ nodes:
     description: 询价单完成
     status: completed
 ```
+
+## 测试策略
+
+### Mock 对象
+
+程序节点（action 类型）在测试中需要 mock：
+
+| 节点 | Mock 内容 | 说明 |
+|------|----------|------|
+| `create_inquiry` | Mock 创建询价单的数据库写入 | 返回固定 task_id，不实际操作 ERP |
+| `send_inquiry` | Mock SMTP 邮件发送 | 记录调用参数，不实际发邮件 |
+| `push_to_erp` | Mock Oracle EBS API 调用 | 模拟成功/失败响应，不实际调 ERP |
+
+interrupt 节点（`check_quotes`）是唯一的真实人类交互点，在测试中通过 `WorkflowExecutor` 的 `resume` 接口模拟用户回调。
+
+### Unit 测试
+
+文件：`tests/unit/test_inquiry_workflow.py`
+
+验证 WorkflowBuilder 能正确构建询价工作流图：
+
+1. **构建工作流** — 加载 `inquiry.yml` 配置，build 成功，compile 通过
+2. **节点结构** — 验证 5 个节点类型正确（3 action + 1 interrupt + 1 terminal）
+3. **interrupt 分支** — 验证 `check_quotes` 节点有 2 个 transitions，条件表达式正确
+4. **条件路由** — 分别传入 `action == "new_round"` 和 `action == "push_erp"` 验证路由到正确节点
+
+### 集成测试
+
+文件：`tests/integration/test_inquiry_workflow.py`
+
+集成真实数据库（SQLite），mock 程序节点外部依赖，验证完整流程：
+
+1. **正常流程：直接推送 ERP**
+   - 创建询价任务 → 执行到 `check_quotes` interrupt
+   - 验证数据库中任务状态、pending_callback 正确
+   - 回调 `push_erp` 分支（带 quotes + winners）
+   - 验证任务流转到 `push_to_erp` → `completed`
+   - 验证数据库中任务最终状态为 completed
+
+2. **多轮询价后推送 ERP**
+   - 创建询价任务 → 执行到 interrupt
+   - 回调 `new_round`（带 new_deadline）
+   - 验证任务回到 `send_inquiry`，再次到 interrupt
+   - 第二轮回调 `push_erp`
+   - 验证任务流转到 completed
+   - 验证数据库中记录了两轮询价历史
+
+3. **form_schema 校验**
+   - `new_round` 分支：缺少 `new_deadline` 应校验失败
+   - `push_erp` 分支：缺少 `quotes` 或 `winners` 应校验失败
+   - `push_erp` 分支：`winners` 中引用不存在的 supplier_id 应校验失败
+
+4. **数据库持久化验证**
+   - 每次回调后检查 tasks 表中 status、data 字段更新正确
+   - 验证 event_store 中 event_id 幂等性（重复回调返回失败）
+
