@@ -40,12 +40,16 @@ class WorkflowBuilder:
         """
         Build a LangGraph StateGraph from workflow configuration.
 
+        The returned StateGraph is *not* compiled yet. Call
+        ``WorkflowBuilder.compile(graph, config)`` to get a runnable graph
+        with interrupt support and an optional checkpointer.
+
         Args:
             config: Workflow configuration dictionary
             version: Version identifier for the workflow
 
         Returns:
-            Compiled StateGraph instance ready for execution
+            Un-compiled StateGraph instance.
         """
         from typing import TypedDict
 
@@ -53,6 +57,7 @@ class WorkflowBuilder:
         class WorkflowState(TypedDict):
             """State schema for workflow execution."""
             input: Any
+            action: Optional[str]
             is_approved: Optional[bool]
             audit_opinion: Optional[str]
             approver: Optional[str]
@@ -76,6 +81,38 @@ class WorkflowBuilder:
             WorkflowBuilder._add_edges(graph, node, nodes_by_id)
 
         return graph
+
+    @staticmethod
+    def get_interrupt_node_ids(config: Dict[str, Any]) -> List[str]:
+        """Return the IDs of all interrupt-type nodes in the config.
+
+        Args:
+            config: Workflow configuration dictionary.
+
+        Returns:
+            List of node IDs whose type is ``interrupt``.
+        """
+        return [
+            node["id"]
+            for node in config.get("nodes", [])
+            if node.get("type") == "interrupt"
+        ]
+
+    @staticmethod
+    def get_node_config(config: Dict[str, Any], node_id: str) -> Optional[Dict[str, Any]]:
+        """Return the configuration dict for a specific node.
+
+        Args:
+            config: Workflow configuration dictionary.
+            node_id: The node identifier.
+
+        Returns:
+            The node configuration dict, or None if not found.
+        """
+        for node in config.get("nodes", []):
+            if node["id"] == node_id:
+                return node
+        return None
 
     @staticmethod
     def _add_node(graph: StateGraph, node: Dict[str, Any]) -> None:
@@ -156,7 +193,7 @@ class WorkflowBuilder:
 
             if len(transitions) == 1:
                 # Single transition - use direct edge
-                next_node = transitions[0]["next"]
+                next_node = transitions[0]["target_node"]
                 if WorkflowBuilder._is_terminal_node(nodes_by_id.get(next_node, {})):
                     graph.add_edge(node_id, END)
                 else:
@@ -168,18 +205,18 @@ class WorkflowBuilder:
                     for transition in transitions:
                         condition = transition.get("condition", "")
                         if WorkflowBuilder._evaluate_condition(condition, state):
-                            return transition["next"]
+                            return transition["target_node"]
                     # Default to first transition if no condition matches
-                    return transitions[0]["next"]
+                    return transitions[0]["target_node"]
 
                 # Build path map for conditional edges
                 path_map = {}
                 for transition in transitions:
-                    next_node = transition["next"]
+                    next_node = transition["target_node"]
                     if WorkflowBuilder._is_terminal_node(nodes_by_id.get(next_node, {})):
-                        path_map[transition["next"]] = END
+                        path_map[next_node] = END
                     else:
-                        path_map[transition["next"]] = transition["next"]
+                        path_map[next_node] = next_node
 
                 graph.add_conditional_edges(
                     node_id,
@@ -187,9 +224,9 @@ class WorkflowBuilder:
                     path_map
                 )
 
-        # Handle direct 'next' for action nodes
-        elif "next" in node:
-            next_node = node["next"]
+        # Handle direct 'target_node' for action nodes
+        elif "target_node" in node:
+            next_node = node["target_node"]
             if WorkflowBuilder._is_terminal_node(nodes_by_id.get(next_node, {})):
                 graph.add_edge(node_id, END)
             else:

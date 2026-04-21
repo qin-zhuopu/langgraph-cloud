@@ -10,11 +10,14 @@ from typing import Optional
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
-from app.api.deps import set_task_service
+from app.api.deps import set_task_service, set_workflow_repo
 from app.api.routes import router
+from app.api.adapter import adapter_router
+from app.config import AppConfig, load_config
 from app.domain.interfaces import IMessageBus
 from app.infrastructure.database import Database
 from app.infrastructure.event_store import SQLiteEventStore
+from app.infrastructure.kafka_producer import KafkaEventProducer
 from app.infrastructure.sqlite_bus import SQLiteMessageBus
 from app.infrastructure.sqlite_repository import SQLiteTaskRepository
 from app.infrastructure.workflow_repo import SQLiteWorkflowRepo
@@ -53,27 +56,38 @@ def get_app_state() -> AppState:
     return _app_state
 
 
+async def _load_workflow_configs(
+    builder: WorkflowBuilder,
+    workflow_repo: "SQLiteWorkflowRepo",
+) -> None:
+    """Load all YAML workflow configurations into the database.
+
+    Scans the workflow config directory for .yml files and saves each one
+    as the active version in the workflow_versions table.
+    """
+    from pathlib import Path
+
+    config_dir = Path(__file__).parent.parent / "workflow" / "config"
+    for yml_file in config_dir.glob("*.yml"):
+        workflow_name = yml_file.stem
+        config = builder.load_config(workflow_name)
+        # Save as v1 active version (idempotent via INSERT OR REPLACE)
+        await workflow_repo.save_version(
+            version="v1",
+            workflow_name=workflow_name,
+            config=config,
+            active=True,
+        )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan manager handling startup and shutdown.
-
-    Startup:
-    1. Initialize database connection
-    2. Create all repositories and services
-    3. Load workflow configurations
-    4. Register dependencies
-
-    Shutdown:
-    1. Close database connections
-
-    Args:
-        app: The FastAPI application instance.
-    """
-    # Configuration - in production, load from environment
-    db_path = "langgraph_cloud.db"
+    """Application lifespan manager handling startup and shutdown."""
+    # Load configuration
+    app_config: AppConfig = getattr(app, "_app_config", None) or load_config()
 
     # Initialize database
-    database = Database(db_path)
+    database = Database(app_config.db_path)
     conn = await database.connect()
     await database.init_tables(conn)
     await conn.close()
@@ -84,9 +98,22 @@ async def lifespan(app: FastAPI):
     event_store = SQLiteEventStore(database)
     workflow_repo = SQLiteWorkflowRepo(database)
 
+    # Initialize Kafka producer (optional)
+    kafka_producer = None
+    if app_config.kafka_brokers:
+        kafka_producer = KafkaEventProducer()
+        await kafka_producer.start(app_config.kafka_brokers)
+
     # Initialize workflow components
     builder = WorkflowBuilder()
-    executor = WorkflowExecutor(message_bus)
+    executor = WorkflowExecutor(
+        message_bus,
+        kafka_producer=kafka_producer,
+        kafka_topic=app_config.kafka_topic,
+    )
+
+    # Load workflow configurations from YAML files into the database
+    await _load_workflow_configs(builder, workflow_repo)
 
     # Initialize task service
     task_service = TaskService(
@@ -98,8 +125,9 @@ async def lifespan(app: FastAPI):
         executor=executor,
     )
 
-    # Set global dependency
+    # Set global dependencies
     set_task_service(task_service)
+    set_workflow_repo(workflow_repo)
 
     # Store app state globally
     global _app_state
@@ -116,8 +144,9 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    # Shutdown: close connections
-    # SQLite connections are automatically closed when out of scope
+    # Shutdown
+    if kafka_producer:
+        await kafka_producer.stop()
     _app_state = None
 
 
@@ -136,6 +165,7 @@ def create_app() -> FastAPI:
 
     # Include routes
     app.include_router(router)
+    app.include_router(adapter_router)
 
     # Root endpoint
     @app.get("/")

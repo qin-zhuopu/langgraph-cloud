@@ -190,3 +190,18 @@ class IWorkflowRepo(ABC):
             active: Whether this should be the active version.
         """
         ...
+
+    @abstractmethod
+    async def list_orchestrations(
+        self, page: int = 1, page_size: int = 20
+    ) -> dict[str, Any]:
+        """List orchestration summaries with pagination.
+
+        Args:
+            page: Page number (1-indexed).
+            page_size: Number of items per page.
+
+        Returns:
+            Dict with keys: total, page, page_size, items.
+        """
+        ...

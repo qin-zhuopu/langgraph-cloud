@@ -1,27 +1,35 @@
 """FastAPI routes for REST and WebSocket endpoints.
 
-This module defines the API router with REST endpoints for task management
-and a WebSocket endpoint for real-time event streaming.
+This module defines the API router with REST endpoints for task management,
+orchestration metadata queries, and a WebSocket endpoint for real-time
+event streaming.
 """
+import asyncio
 import json
-from collections.abc import AsyncIterator
-from typing import Any
+from typing import Any, Optional
 
-from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect, status
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, HTTPException, Query, WebSocket, WebSocketDisconnect, status
 
-from app.api.deps import TaskServiceDep, set_task_service
+from app.api.deps import TaskServiceDep, WorkflowRepoDep
 from app.domain.schemas import (
     CallbackRequest,
     CallbackResponse,
-    ErrorResponse,
+    EventMessage,
+    NodeSchema,
+    OrchestrationDetail,
+    OrchestrationListResponse,
     Task,
     TaskCreate,
     TaskResponse,
+    TransitionSchema,
 )
-from app.domain.schemas import EventMessage
 
 router = APIRouter()
+
+
+# ---------------------------------------------------------------------------
+# Task endpoints
+# ---------------------------------------------------------------------------
 
 
 @router.post("/v1/tasks", response_model=TaskResponse, status_code=status.HTTP_201_CREATED)
@@ -29,32 +37,18 @@ async def create_task(
     request: TaskCreate,
     task_service: TaskServiceDep,
 ) -> TaskResponse:
-    """Create a new task and start its workflow execution.
-
-    Args:
-        request: The task creation request containing user_id and task data.
-        task_service: The TaskService dependency.
-
-    Returns:
-        TaskResponse: The created task with its ID and status.
-
-    Raises:
-        HTTPException: If workflow not found (404) or other error occurs (500).
-    """
+    """Create a new task and start its workflow execution."""
     try:
         task_dict = await task_service.create_task(
             user_id=request.user_id,
             task_type=request.task.type,
             data=request.task.data,
         )
-        # Convert dict to Task schema
         task = Task(**task_dict)
         return TaskResponse(task=task)
     except ValueError as e:
-        # Workflow not found
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        # Other errors
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to create task: {e}",
@@ -66,18 +60,7 @@ async def get_task(
     task_id: str,
     task_service: TaskServiceDep,
 ) -> TaskResponse:
-    """Get a task by ID.
-
-    Args:
-        task_id: The task identifier.
-        task_service: The TaskService dependency.
-
-    Returns:
-        TaskResponse: The task details.
-
-    Raises:
-        HTTPException: If task not found (404).
-    """
+    """Get a task by ID, including pending_callback when interrupted."""
     task_dict = await task_service.get_task(task_id)
     if task_dict is None:
         raise HTTPException(
@@ -96,102 +79,165 @@ async def callback_task(
 ) -> CallbackResponse:
     """Handle user callback to resume a workflow from an interrupt.
 
-    Args:
-        task_id: The task ID associated with the callback.
-        request: The callback request containing event_id, node_id, and user_input.
-        task_service: The TaskService dependency.
-
-    Returns:
-        CallbackResponse: The result of the callback operation.
-
-    Raises:
-        HTTPException: If task not found (404), event already consumed (400), or other error (500).
+    Validates action against node transitions and user_input against form_schema.
     """
     try:
         task_dict = await task_service.callback(
             task_id=task_id,
             event_id=request.event_id,
             node_id=request.node_id,
+            action=request.action,
             user_input=request.user_input,
         )
         return CallbackResponse(success=True, next_status=task_dict["status"])
     except ValueError as e:
-        # Event already consumed or other value error
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except RuntimeError as e:
-        # Task not found
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        # Other errors
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Callback failed: {e}",
         )
 
 
+# ---------------------------------------------------------------------------
+# Orchestration endpoints
+# ---------------------------------------------------------------------------
+
+
+@router.get("/v1/orchestrations", response_model=OrchestrationListResponse)
+async def list_orchestrations(
+    workflow_repo: WorkflowRepoDep,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+) -> OrchestrationListResponse:
+    """List available orchestration definitions with pagination."""
+    result = await workflow_repo.list_orchestrations(page=page, page_size=page_size)
+    return OrchestrationListResponse(**result)
+
+
+@router.get("/v1/orchestrations/{orch_type}/versions/{version}", response_model=OrchestrationDetail)
+async def get_orchestration_version(
+    orch_type: str,
+    version: str,
+    workflow_repo: WorkflowRepoDep,
+) -> OrchestrationDetail:
+    """Get the full orchestration definition for a specific version."""
+    workflow_result = await workflow_repo.get_by_version(orch_type, version)
+    if workflow_result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Orchestration not found: {orch_type} version {version}",
+        )
+    return _config_to_orchestration_detail(workflow_result)
+
+
+@router.get("/v1/orchestrations/{orch_type}/versions/{version}/nodes/{node_id}", response_model=NodeSchema)
+async def get_orchestration_node(
+    orch_type: str,
+    version: str,
+    node_id: str,
+    workflow_repo: WorkflowRepoDep,
+) -> NodeSchema:
+    """Get a single node definition from an orchestration version."""
+    workflow_result = await workflow_repo.get_by_version(orch_type, version)
+    if workflow_result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Orchestration not found: {orch_type} version {version}",
+        )
+
+    config = workflow_result["config"]
+    for node in config.get("nodes", []):
+        if node["id"] == node_id:
+            return _node_dict_to_schema(node)
+
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail=f"Node not found: {node_id}",
+    )
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _config_to_orchestration_detail(workflow_result: dict) -> OrchestrationDetail:
+    """Convert a workflow_repo result dict to an OrchestrationDetail schema."""
+    config = workflow_result["config"]
+    nodes = [_node_dict_to_schema(n) for n in config.get("nodes", [])]
+    return OrchestrationDetail(
+        type=config.get("name", workflow_result.get("workflow_name", "")),
+        version=workflow_result["version"],
+        description=config.get("description", config.get("display_name", "")),
+        nodes=nodes,
+    )
+
+
+def _node_dict_to_schema(node: dict) -> NodeSchema:
+    """Convert a raw node config dict to a NodeSchema."""
+    transitions = None
+    if node.get("type") == "interrupt" and "transitions" in node:
+        transitions = [
+            TransitionSchema(
+                action=t["action"],
+                label=t["label"],
+                target_node=t["target_node"],
+                form_schema=t.get("form_schema", {}),
+            )
+            for t in node["transitions"]
+        ]
+    return NodeSchema(
+        id=node["id"],
+        type=node["type"],
+        description=node.get("description", ""),
+        transitions=transitions,
+    )
+
+
+# ---------------------------------------------------------------------------
+# WebSocket endpoint
+# ---------------------------------------------------------------------------
+
+
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket) -> None:
-    """WebSocket endpoint for real-time workflow event streaming.
-
-    Clients connect with a user_id query parameter to receive events
-    for that user's tasks. The endpoint:
-    1. Accepts the connection
-    2. Registers a listener for the user
-    3. Pushes EventMessage objects as JSON
-    4. Cleans up on disconnect
-
-    Query parameters:
-        user_id: The user ID to subscribe to events for.
-
-    Connection format:
-        Messages are JSON objects matching EventMessage schema.
-    """
-    # Get user_id from query params
+    """WebSocket endpoint for real-time workflow event streaming."""
     user_id = websocket.query_params.get("user_id")
     if not user_id:
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
 
-    # Accept the connection
     await websocket.accept()
 
-    # Import here to avoid circular dependency
     from app.api.main import get_app_state
 
     app_state = get_app_state()
     message_bus = app_state.message_bus
 
-    # Create a queue for this connection
-    import asyncio
     queue: asyncio.Queue[EventMessage] = asyncio.Queue()
 
     try:
-        # Register listener
         message_bus.register_listener(user_id, queue)
 
-        # Listen for messages and send to client
         while True:
             try:
-                # Wait for message with timeout to allow checking connection health
                 event = await asyncio.wait_for(queue.get(), timeout=1.0)
-                # Send as JSON
                 await websocket.send_json(event.model_dump())
             except asyncio.TimeoutError:
-                # Send heartbeat periodically
                 try:
-                    # Use ping with empty bytes
                     await websocket.ping()
                 except Exception:
                     break
             except WebSocketDisconnect:
                 break
 
-    except Exception as e:
-        # Log error (in production, use proper logging)
+    except Exception:
         pass
 
     finally:
-        # Clean up: unregister listener
         message_bus.unregister_listener(user_id, queue)
         try:
             await websocket.close()

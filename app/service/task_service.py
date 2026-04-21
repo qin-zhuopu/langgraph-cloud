@@ -7,9 +7,11 @@ workflow engine.
 import uuid
 from typing import Any, Dict, Optional
 
+import jsonschema
+
 from app.domain.interfaces import IEventStore, IMessageBus, ITaskRepository, IWorkflowRepo
 from app.workflow.builder import WorkflowBuilder
-from app.workflow.executor import WorkflowExecutor
+from app.workflow.executor import ExecutionResult, WorkflowExecutor
 
 
 class TaskService:
@@ -19,15 +21,7 @@ class TaskService:
     - Task creation and persistence
     - Workflow configuration loading
     - Graph building and execution
-    - Callback handling for user input during workflow interrupts
-
-    Attributes:
-        task_repo: Repository for task persistence.
-        message_bus: Message bus for publishing workflow events.
-        event_store: Event store for tracking consumed events (replay protection).
-        workflow_repo: Repository for workflow configuration.
-        builder: WorkflowBuilder for constructing LangGraph graphs.
-        executor: WorkflowExecutor for running workflows.
+    - Callback handling with action + form_schema validation
     """
 
     def __init__(
@@ -39,16 +33,6 @@ class TaskService:
         builder: WorkflowBuilder,
         executor: WorkflowExecutor,
     ) -> None:
-        """Initialize the TaskService with its dependencies.
-
-        Args:
-            task_repo: Repository for task persistence operations.
-            message_bus: Message bus for publishing workflow events.
-            event_store: Event store for replay protection.
-            workflow_repo: Repository for workflow configuration.
-            builder: WorkflowBuilder for constructing graphs.
-            executor: WorkflowExecutor for running workflows.
-        """
         self._task_repo = task_repo
         self._message_bus = message_bus
         self._event_store = event_store
@@ -56,14 +40,12 @@ class TaskService:
         self._builder = builder
         self._executor = executor
 
+    # ------------------------------------------------------------------
+    # Create
+    # ------------------------------------------------------------------
+
     async def create_task(self, user_id: str, task_type: str, data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new task and start its workflow execution.
-
-        This method:
-        1. Creates a task record in the repository
-        2. Loads the workflow configuration for the task type
-        3. Builds the LangGraph graph
-        4. Executes the graph with the provided data
 
         Args:
             user_id: The user ID who is creating the task.
@@ -71,15 +53,7 @@ class TaskService:
             data: Business data for the task.
 
         Returns:
-            dict: The created task record with keys:
-                - id: Task ID
-                - user_id: User ID
-                - type: Task type
-                - workflow_version: Workflow version used
-                - status: Task status
-                - data: Task data
-                - created_at: Creation timestamp
-                - updated_at: Last update timestamp
+            dict: The created task record.
 
         Raises:
             ValueError: If workflow configuration is not found.
@@ -109,22 +83,35 @@ class TaskService:
         graph = self._builder.build(workflow_config, workflow_version)
 
         # Execute the workflow
-        thread_id = task_id  # Use task_id as thread_id for checkpointing
-        status = await self._executor.execute(
+        result: ExecutionResult = await self._executor.execute(
             graph=graph,
-            thread_id=thread_id,
+            thread_id=task_id,
             user_id=user_id,
             task_id=task_id,
             task_type=task_type,
             initial_data=data,
+            workflow_config=workflow_config,
         )
+
+        # Derive business-semantic status
+        status = self._derive_status(result, workflow_config)
 
         # Update task status
         await self._task_repo.update_status(task_id, status)
 
+        # Update pending_callback if interrupted
+        if result.status == "interrupted" and result.event_id and result.node_id:
+            await self._task_repo.update_pending_callback(
+                task_id, result.event_id, result.node_id
+            )
+
         # Return updated task
         updated_task = await self._task_repo.get(task_id)
         return updated_task if updated_task is not None else task
+
+    # ------------------------------------------------------------------
+    # Read
+    # ------------------------------------------------------------------
 
     async def get_task(self, task_id: str) -> Optional[Dict[str, Any]]:
         """Get a task by ID.
@@ -133,47 +120,44 @@ class TaskService:
             task_id: The task identifier.
 
         Returns:
-            The task record dict or None if not found. Keys:
-                - id: Task ID
-                - user_id: User ID
-                - type: Task type
-                - workflow_version: Workflow version used
-                - status: Task status
-                - data: Task data
-                - created_at: Creation timestamp
-                - updated_at: Last update timestamp
+            The task record dict or None if not found.
         """
         return await self._task_repo.get(task_id)
+
+    # ------------------------------------------------------------------
+    # Callback
+    # ------------------------------------------------------------------
 
     async def callback(
         self,
         task_id: str,
         event_id: str,
         node_id: str,
+        action: str,
         user_input: Dict[str, Any],
     ) -> Dict[str, Any]:
         """Handle user callback for a workflow interrupt.
 
-        This method:
-        1. Validates the event hasn't been consumed (replay protection)
-        2. Marks the event as consumed
-        3. Resumes the workflow with user input
-        4. Updates task status
+        Validates:
+        1. event_id not already consumed (replay protection)
+        2. action is a valid transition for the node
+        3. user_input passes the transition's form_schema
 
         Args:
             task_id: The task ID associated with the callback.
             event_id: The event ID for replay protection.
             node_id: The node ID where the interrupt occurred.
+            action: The user-selected transition action.
             user_input: The user's input data to resume the workflow.
 
         Returns:
             dict: The updated task record.
 
         Raises:
-            ValueError: If the event has already been consumed.
+            ValueError: If validation fails (event consumed, invalid action, schema mismatch).
             RuntimeError: If the task is not found.
         """
-        # Check if event has already been consumed (replay protection)
+        # 1. Replay protection
         if await self._event_store.is_consumed(event_id):
             raise ValueError(f"Event already consumed: {event_id}")
 
@@ -197,25 +181,68 @@ class TaskService:
 
         workflow_config = workflow_result["config"]
 
+        # 2. Validate action against node transitions
+        node_cfg = WorkflowBuilder.get_node_config(workflow_config, node_id)
+        if node_cfg is None:
+            raise ValueError(f"Node not found in orchestration: {node_id}")
+
+        transitions = node_cfg.get("transitions", [])
+        matched_transition = None
+        for t in transitions:
+            if t.get("action") == action:
+                matched_transition = t
+                break
+
+        if matched_transition is None:
+            valid_actions = [t.get("action") for t in transitions]
+            raise ValueError(
+                f"Invalid action '{action}' for node '{node_id}'. "
+                f"Valid actions: {valid_actions}"
+            )
+
+        # 3. Validate user_input against form_schema
+        form_schema = matched_transition.get("form_schema")
+        if form_schema:
+            try:
+                jsonschema.validate(instance=user_input, schema=form_schema)
+            except jsonschema.ValidationError as e:
+                raise ValueError(f"user_input validation failed: {e.message}")
+
+        # Clear pending callback before resuming
+        await self._task_repo.clear_pending_callback(task_id)
+
         # Build the graph
         graph = self._builder.build(workflow_config, workflow_version)
 
+        # Merge action into user_input so the condition routing function
+        # can evaluate expressions like `action == "award"` against the state.
+        resume_data = {**user_input, "action": action}
+
         # Resume workflow execution
-        thread_id = task_id  # Use task_id as thread_id
         user_id = task["user_id"]
 
-        status = await self._executor.resume(
+        result: ExecutionResult = await self._executor.resume(
             graph=graph,
-            thread_id=thread_id,
+            thread_id=task_id,
             task_id=task_id,
             user_id=user_id,
             task_type=task_type,
             node_id=node_id,
-            user_input=user_input,
+            user_input=resume_data,
+            workflow_config=workflow_config,
         )
+
+        # Derive business-semantic status
+        status = self._derive_status(result, workflow_config)
 
         # Update task status with user input data merged
         await self._task_repo.update_status(task_id, status, data=user_input)
+
+        # Update pending_callback if interrupted again
+        if result.status == "interrupted" and result.event_id and result.node_id:
+            await self._task_repo.update_pending_callback(
+                task_id, result.event_id, result.node_id
+            )
 
         # Return updated task
         updated_task = await self._task_repo.get(task_id)
@@ -223,3 +250,26 @@ class TaskService:
             raise RuntimeError(f"Failed to retrieve task after callback: {task_id}")
 
         return updated_task
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _derive_status(result: ExecutionResult, workflow_config: Optional[Dict[str, Any]]) -> str:
+        """Derive a business-semantic status string from an ExecutionResult.
+
+        For interrupted workflows, generates ``awaiting_{node_id}``.
+        For completed workflows, returns ``completed``.
+        For errors, returns ``error``.
+
+        Args:
+            result: The execution result.
+            workflow_config: The workflow configuration (for future terminal status lookup).
+
+        Returns:
+            A business-semantic status string.
+        """
+        if result.status == "interrupted" and result.node_id:
+            return f"awaiting_{result.node_id}"
+        return result.status

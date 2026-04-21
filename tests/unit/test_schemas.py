@@ -60,7 +60,7 @@ class TestTask:
         assert task.id == "task1"
         assert task.user_id == "user123"
         assert task.type == "workflow1"
-        assert task.workflow_version == "v1"  # default value
+        assert task.orchestration_version == "v1"  # default value
         assert task.status == "pending"
         assert task.data == {"key": "value"}
 
@@ -96,10 +96,12 @@ class TestCallbackRequest:
         request = CallbackRequest(
             event_id="event1",
             node_id="node1",
+            action="approve",
             user_input={"param1": "value1"},
         )
         assert request.event_id == "event1"
         assert request.node_id == "node1"
+        assert request.action == "approve"
         assert request.user_input == {"param1": "value1"}
 
     def test_callback_request_missing_event_id(self):

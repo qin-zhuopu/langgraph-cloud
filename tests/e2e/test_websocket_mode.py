@@ -123,7 +123,7 @@ def purchase_request_workflow_config() -> dict:
                 "type": "action",
                 "display_name": "提交申请",
                 "description": "用户提交采购申请",
-                "next": "manager_audit",
+                "target_node": "manager_audit",
             },
             {
                 "id": "manager_audit",
@@ -132,8 +132,8 @@ def purchase_request_workflow_config() -> dict:
                 "description": "部门经理审批采购申请",
                 "required_params": ["is_approved", "audit_opinion", "approver"],
                 "transitions": [
-                    {"condition": "is_approved == true", "next": "finance_audit"},
-                    {"condition": "is_approved == false", "next": "rejected"},
+                    {"condition": "is_approved == true", "target_node": "finance_audit"},
+                    {"condition": "is_approved == false", "target_node": "rejected"},
                 ],
             },
             {
@@ -143,8 +143,8 @@ def purchase_request_workflow_config() -> dict:
                 "description": "财务部门审批采购申请",
                 "required_params": ["is_approved", "audit_opinion", "approver"],
                 "transitions": [
-                    {"condition": "is_approved == true", "next": "approved"},
-                    {"condition": "is_approved == false", "next": "rejected"},
+                    {"condition": "is_approved == true", "target_node": "approved"},
+                    {"condition": "is_approved == false", "target_node": "rejected"},
                 ],
             },
             {
@@ -236,7 +236,7 @@ async def test_websocket_mode_task_creation_flow(
 
         final_task = get_response.json()["task"]
         assert final_task["id"] == task_id
-        assert final_task["status"] in ("completed", "interrupted", "error")
+        assert final_task["status"] in ("completed", "interrupted", "error", "awaiting_manager_audit")
 
     finally:
         # Clean up listener
@@ -267,7 +267,7 @@ async def test_websocket_mode_no_messages_on_complete(
                 "id": "start",
                 "type": "action",
                 "display_name": "Start",
-                "next": "end",
+                "target_node": "end",
             },
             {
                 "id": "end",
@@ -351,7 +351,7 @@ async def test_websocket_mode_listener_isolation(
                 "id": "start",
                 "type": "action",
                 "display_name": "Start",
-                "next": "end",
+                "target_node": "end",
             },
             {
                 "id": "end",

@@ -133,7 +133,7 @@ def purchase_request_workflow_v1() -> dict:
                 "type": "action",
                 "display_name": "提交申请",
                 "description": "用户提交采购申请",
-                "next": "manager_audit",
+                "target_node": "manager_audit",
             },
             {
                 "id": "manager_audit",
@@ -142,8 +142,8 @@ def purchase_request_workflow_v1() -> dict:
                 "description": "部门经理审批采购申请",
                 "required_params": ["is_approved", "audit_opinion", "approver"],
                 "transitions": [
-                    {"condition": "is_approved == true", "next": "approved"},
-                    {"condition": "is_approved == false", "next": "rejected"},
+                    {"condition": "is_approved == true", "target_node": "approved"},
+                    {"condition": "is_approved == false", "target_node": "rejected"},
                 ],
             },
             {
@@ -185,7 +185,7 @@ def purchase_request_workflow_v2() -> dict:
                 "type": "action",
                 "display_name": "提交申请",
                 "description": "用户提交采购申请",
-                "next": "manager_audit",
+                "target_node": "manager_audit",
             },
             {
                 "id": "manager_audit",
@@ -194,8 +194,8 @@ def purchase_request_workflow_v2() -> dict:
                 "description": "部门经理审批采购申请",
                 "required_params": ["is_approved", "audit_opinion", "approver"],
                 "transitions": [
-                    {"condition": "is_approved == true", "next": "cto_audit"},
-                    {"condition": "is_approved == false", "next": "rejected"},
+                    {"condition": "is_approved == true", "target_node": "cto_audit"},
+                    {"condition": "is_approved == false", "target_node": "rejected"},
                 ],
             },
             {
@@ -205,8 +205,8 @@ def purchase_request_workflow_v2() -> dict:
                 "description": "CTO审批大额采购申请",
                 "required_params": ["is_approved", "audit_opinion", "approver"],
                 "transitions": [
-                    {"condition": "is_approved == true", "next": "approved"},
-                    {"condition": "is_approved == false", "next": "rejected"},
+                    {"condition": "is_approved == true", "target_node": "approved"},
+                    {"condition": "is_approved == false", "target_node": "rejected"},
                 ],
             },
             {
@@ -330,7 +330,7 @@ async def test_workflow_version_isolation_on_upgrade(
 
     # Verify task A was created with v1
     assert task_a_data["type"] == "purchase_request"
-    assert task_a_data["workflow_version"] == "v1"
+    assert task_a_data["orchestration_version"] == "v1"
 
     # Step 3: Insert v2 config as active (simulating upgrade)
     await workflow_repo.save_version(
@@ -362,7 +362,7 @@ async def test_workflow_version_isolation_on_upgrade(
 
     # Verify task B was created with v2
     assert task_b_data["type"] == "purchase_request"
-    assert task_b_data["workflow_version"] == "v2"
+    assert task_b_data["orchestration_version"] == "v2"
 
     # Step 5: Verify task A still has v1 when queried
     task_a_from_db = await task_repo.get(task_a_id)
@@ -423,7 +423,7 @@ async def test_workflow_version_multiple_coexisting_versions(
                 "id": "start",
                 "type": "action",
                 "display_name": "Start",
-                "next": "end",
+                "target_node": "end",
             },
             {
                 "id": "end",
@@ -450,13 +450,13 @@ async def test_workflow_version_multiple_coexisting_versions(
                 "id": "start",
                 "type": "action",
                 "display_name": "Start",
-                "next": "middle",
+                "target_node": "middle",
             },
             {
                 "id": "middle",
                 "type": "action",
                 "display_name": "Middle Node (added in v2)",
-                "next": "end",
+                "target_node": "end",
             },
             {
                 "id": "end",
@@ -504,7 +504,7 @@ async def test_workflow_version_multiple_coexisting_versions(
     assert response.status_code == 201
 
     task_data = response.json()["task"]
-    assert task_data["workflow_version"] == "v2"
+    assert task_data["orchestration_version"] == "v2"
 
     # Make v1 active again
     await workflow_repo.save_version(
@@ -532,7 +532,7 @@ async def test_workflow_version_multiple_coexisting_versions(
     assert response_2.status_code == 201
 
     task_data_2 = response_2.json()["task"]
-    assert task_data_2["workflow_version"] == "v1"
+    assert task_data_2["orchestration_version"] == "v1"
 
 
 @pytest.mark.e2e
@@ -562,7 +562,7 @@ async def test_workflow_version_task_persistence(
                 "id": "start",
                 "type": "action",
                 "display_name": "Start",
-                "next": "end",
+                "target_node": "end",
             },
             {
                 "id": "end",
@@ -595,7 +595,7 @@ async def test_workflow_version_task_persistence(
 
     task_data = response.json()["task"]
     task_id = task_data["id"]
-    original_version = task_data["workflow_version"]
+    original_version = task_data["orchestration_version"]
 
     assert original_version == "v1"
 
@@ -609,7 +609,7 @@ async def test_workflow_version_task_persistence(
     )
 
     # Verify workflow_version is still v1 after completion
-    assert final_task["workflow_version"] == "v1"
+    assert final_task["orchestration_version"] == "v1"
 
     # Also verify by querying the task directly from repo
     task_from_db = await task_repo.get(task_id)

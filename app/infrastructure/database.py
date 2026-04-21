@@ -54,6 +54,8 @@ class Database:
                 workflow_version TEXT NOT NULL DEFAULT 'v1',
                 status TEXT NOT NULL,
                 data TEXT NOT NULL DEFAULT '{}',
+                pending_event_id TEXT,
+                pending_node_id TEXT,
                 created_at TEXT NOT NULL DEFAULT (datetime('now')),
                 updated_at TEXT NOT NULL DEFAULT (datetime('now'))
             )

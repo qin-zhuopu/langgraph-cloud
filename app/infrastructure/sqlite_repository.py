@@ -73,7 +73,9 @@ class SQLiteTaskRepository(ITaskRepository):
             await self._db.init_tables(conn)
             cursor = await conn.execute(
                 """
-                SELECT id, user_id, type, workflow_version, status, data, created_at, updated_at
+                SELECT id, user_id, type, workflow_version, status, data,
+                       pending_event_id, pending_node_id,
+                       created_at, updated_at
                 FROM tasks WHERE id = ?
                 """,
                 (task_id,),
@@ -83,16 +85,27 @@ class SQLiteTaskRepository(ITaskRepository):
             if row is None:
                 return None
 
-            return {
+            result: dict[str, Any] = {
                 "id": row[0],
                 "user_id": row[1],
                 "type": row[2],
                 "workflow_version": row[3],
                 "status": row[4],
                 "data": json.loads(row[5]) if row[5] else {},
-                "created_at": row[6],
-                "updated_at": row[7],
+                "created_at": row[8],
+                "updated_at": row[9],
             }
+
+            # Build pending_callback if both fields are present
+            if row[6] and row[7]:
+                result["pending_callback"] = {
+                    "event_id": row[6],
+                    "node_id": row[7],
+                }
+            else:
+                result["pending_callback"] = None
+
+            return result
 
     async def update_status(
         self,
@@ -160,3 +173,54 @@ class SQLiteTaskRepository(ITaskRepository):
             except Exception:
                 await conn.rollback()
                 raise
+
+    async def update_pending_callback(
+        self,
+        task_id: str,
+        event_id: str,
+        node_id: str,
+    ) -> bool:
+        """Set the pending callback fields on a task.
+
+        Args:
+            task_id: The task identifier.
+            event_id: The interrupt event ID.
+            node_id: The interrupt node ID.
+
+        Returns:
+            True if update succeeded, False otherwise.
+        """
+        async with aiosqlite.connect(self._db.db_path) as conn:
+            await self._db.init_tables(conn)
+            cursor = await conn.execute(
+                """
+                UPDATE tasks
+                SET pending_event_id = ?, pending_node_id = ?, updated_at = datetime('now')
+                WHERE id = ?
+                """,
+                (event_id, node_id, task_id),
+            )
+            await conn.commit()
+            return cursor.rowcount > 0
+
+    async def clear_pending_callback(self, task_id: str) -> bool:
+        """Clear the pending callback fields on a task.
+
+        Args:
+            task_id: The task identifier.
+
+        Returns:
+            True if update succeeded, False otherwise.
+        """
+        async with aiosqlite.connect(self._db.db_path) as conn:
+            await self._db.init_tables(conn)
+            cursor = await conn.execute(
+                """
+                UPDATE tasks
+                SET pending_event_id = NULL, pending_node_id = NULL, updated_at = datetime('now')
+                WHERE id = ?
+                """,
+                (task_id,),
+            )
+            await conn.commit()
+            return cursor.rowcount > 0

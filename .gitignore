@@ -59,3 +59,8 @@ skills-lock.json
 
 # Obsidian
 .obsidian/
+
+# Cloned external repos
+raw/jerehpilot/
+raw/deepagents/
+raw/langchain-skills/

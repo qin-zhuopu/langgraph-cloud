@@ -136,3 +136,59 @@ class SQLiteWorkflowRepo(IWorkflowRepo):
                 (version, workflow_name, json.dumps(config), 1 if active else 0),
             )
             await conn.commit()
+
+    async def list_orchestrations(
+        self, page: int = 1, page_size: int = 20
+    ) -> dict[str, Any]:
+        """List orchestration summaries with pagination.
+
+        Returns active workflow versions grouped by workflow_name.
+
+        Args:
+            page: Page number (1-indexed).
+            page_size: Number of items per page.
+
+        Returns:
+            Dict with keys: total, page, page_size, items.
+        """
+        async with aiosqlite.connect(self._db.db_path) as conn:
+            await self._db.init_tables(conn)
+
+            # Count total active orchestrations
+            cursor = await conn.execute(
+                "SELECT COUNT(DISTINCT workflow_name) FROM workflow_versions WHERE active = 1"
+            )
+            row = await cursor.fetchone()
+            total = row[0] if row else 0
+
+            # Fetch paginated results
+            offset = (page - 1) * page_size
+            cursor = await conn.execute(
+                """
+                SELECT version, workflow_name, config, created_at
+                FROM workflow_versions
+                WHERE active = 1
+                ORDER BY workflow_name ASC
+                LIMIT ? OFFSET ?
+                """,
+                (page_size, offset),
+            )
+            rows = await cursor.fetchall()
+
+            items = []
+            for version, workflow_name, config_json, created_at in rows:
+                config = json.loads(config_json) if config_json else {}
+                items.append({
+                    "type": workflow_name,
+                    "latest_version": version,
+                    "description": config.get("description", config.get("display_name", "")),
+                    "created_at": created_at,
+                    "updated_at": created_at,
+                })
+
+            return {
+                "total": total,
+                "page": page,
+                "page_size": page_size,
+                "items": items,
+            }

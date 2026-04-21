@@ -49,7 +49,7 @@
 
 ### GET /v1/tasks/{task_id} — 任务详情
 
-返回业务状态、负责人及**编排定位信息**。当任务处于 interrupt 状态时，`pending_callback` 提供回调所需的最小上下文（`event_id`、`node_id`），客户端凭 `type` + `orchestration_version` + `node_id` 查询编排元数据获取完整的 branches 和 form_schema。
+返回业务状态、负责人及**编排定位信息**。当任务处于 interrupt 状态时，`pending_callback` 提供回调所需的最小上下文（`event_id`、`node_id`），客户端凭 `type` + `orchestration_version` + `node_id` 查询编排元数据获取完整的 transitions 和 form_schema。
 
 ```json
 {
@@ -74,7 +74,7 @@
 
 ### POST /v1/tasks/{task_id}/callback — 人工回调
 
-工作流恢复入口。`event_id` 和 `node_id` 可来源于 Kafka 推送或 GET 详情中的 `pending_callback`。`action` 标识用户选择的分支走向，`user_input` 必须符合编排定义中对应 branch 的 `form_schema`：
+工作流恢复入口。`event_id` 和 `node_id` 可来源于 Kafka 推送或 GET 详情中的 `pending_callback`。`action` 标识用户选择的分支走向，`user_input` 必须符合编排定义中对应 transition 的 `form_schema`：
 
 ```json
 {
@@ -85,7 +85,7 @@
 }
 ```
 
-服务端校验：① `event_id` 未被消费；② `action` 为当前节点合法分支；③ `user_input` 通过对应 branch `form_schema` 的 JSON Schema 校验。通过后标记事件已消费、恢复工作流。
+服务端校验：① `event_id` 未被消费；② `action` 为当前节点合法分支；③ `user_input` 通过对应 transition 的 `form_schema` JSON Schema 校验。通过后标记事件已消费、恢复工作流。
 
 
 ### GET /v1/tasks — 搜索任务
@@ -154,7 +154,7 @@
 
 ### GET /v1/orchestrations/{type}/versions/{version}/nodes/{node_id} — 获取单节点定义
 
-返回指定节点的 branches 和 form_schema，适合按需精确查询。
+返回指定节点的 transitions 和 form_schema，适合按需精确查询。
 
 **Endpoint:** `GET /v1/orchestrations/purchase_request/versions/3/nodes/manager_audit`
 
@@ -164,7 +164,7 @@
   "node_id": "manager_audit",
   "type": "interrupt",
   "description": "部门经理审批",
-  "branches": [
+  "transitions": [
     {
       "action": "approve",
       "label": "批准",
@@ -223,7 +223,7 @@
       "id": "manager_audit",
       "type": "interrupt",
       "description": "部门经理审批",
-      "branches": [
+      "transitions": [
         {
           "action": "approve",
           "label": "批准",
@@ -261,7 +261,7 @@
 }
 ```
 
-- 客户端按 `node_id` 查找对应节点，获取 `branches` 和 `form_schema`
+- 客户端按 `node_id` 查找对应节点，获取 `transitions` 和 `form_schema`
 - 适用于流程图渲染、流程预览等需要全量编排信息的场景
 - 可按 `{type}:{version}` 做客户端缓存
 
