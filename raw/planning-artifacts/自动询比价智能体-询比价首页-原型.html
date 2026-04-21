@@ -1,0 +1,744 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>自动询比价智能体 - 询比价首页</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:"Microsoft YaHei","PingFang SC",sans-serif;background:#f5f6fa;color:#333;display:flex;min-height:100vh;}
+/* Sidebar */
+.sidebar{width:220px;background:#fff;border-right:1px solid #e8e8e8;display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:100;}
+.logo-area{height:60px;display:flex;align-items:center;padding:0 20px;border-bottom:1px solid #e8e8e8;}
+.logo-area .logo-icon{width:32px;height:32px;background:#E6740A;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:bold;font-size:14px;margin-right:10px;}
+.logo-area .logo-text{font-size:15px;font-weight:600;color:#333;}
+.menu{list-style:none;padding:10px 0;}
+.menu li{padding:12px 20px 12px 24px;cursor:pointer;font-size:14px;color:#666;transition:all .2s;border-left:3px solid transparent;}
+.menu li:hover{background:#fef6f0;color:#E6740A;}
+.menu li.active{background:#fef6f0;color:#E6740A;border-left-color:#E6740A;font-weight:600;}
+.menu li .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:#ccc;margin-right:10px;vertical-align:middle;}
+.menu li.active .dot{background:#E6740A;}
+.menu li:hover .dot{background:#E6740A;}
+/* Main */
+.main{margin-left:220px;flex:1;display:flex;flex-direction:column;min-height:100vh;}
+.topbar{height:60px;background:#fff;border-bottom:1px solid #e8e8e8;display:flex;align-items:center;justify-content:space-between;padding:0 24px;position:sticky;top:0;z-index:90;}
+.breadcrumb{font-size:14px;color:#999;}
+.breadcrumb span{color:#333;font-weight:600;}
+.user-info{font-size:13px;color:#666;}
+.user-info b{color:#E6740A;}
+.content{padding:20px 24px;flex:1;}
+/* AI Cards */
+.ai-cards{display:flex;gap:16px;margin-bottom:20px;}
+.ai-card{flex:1;background:linear-gradient(135deg,#fff5eb 0%,#fff 100%);border:1px solid #f5d5b3;border-radius:10px;padding:20px;cursor:pointer;transition:all .25s;}
+.ai-card:hover{box-shadow:0 4px 16px rgba(230,116,10,.15);transform:translateY(-2px);}
+.ai-card .ai-icon{width:44px;height:44px;background:#E6740A;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;margin-bottom:12px;}
+.ai-card h3{font-size:15px;color:#333;margin-bottom:6px;}
+.ai-card p{font-size:12px;color:#999;line-height:1.6;}
+/* Button bar */
+.btn-bar{display:flex;gap:10px;margin-bottom:16px;}
+.btn{padding:8px 18px;border-radius:4px;font-size:13px;cursor:pointer;border:1px solid #dcdfe6;background:#fff;color:#606266;transition:all .2s;}
+.btn:hover{border-color:#E6740A;color:#E6740A;}
+.btn-primary{background:#E6740A;color:#fff;border-color:#E6740A;}
+.btn-primary:hover{background:#cf6609;border-color:#cf6609;color:#fff;}
+.btn-danger{color:#f56c6c;border-color:#fbc4c4;}
+.btn-danger:hover{background:#f56c6c;color:#fff;border-color:#f56c6c;}
+/* Filter */
+.filter-area{background:#fff;border-radius:8px;padding:16px 20px;margin-bottom:16px;display:flex;flex-wrap:wrap;gap:16px;align-items:center;border:1px solid #EBEEF5;}
+.filter-item{display:flex;align-items:center;gap:6px;font-size:13px;color:#606266;}
+.filter-item label{white-space:nowrap;}
+.filter-item input,.filter-item select{height:32px;border:1px solid #dcdfe6;border-radius:4px;padding:0 8px;font-size:12px;outline:none;min-width:110px;}
+.filter-item input:focus,.filter-item select:focus{border-color:#E6740A;}
+.filter-item input[type="date"]{min-width:120px;}
+.filter-actions{display:flex;gap:8px;}
+/* Tabs */
+.tabs{display:flex;border-bottom:2px solid #EBEEF5;margin-bottom:0;}
+.tab{padding:10px 20px;font-size:13px;color:#666;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .2s;}
+.tab:hover{color:#E6740A;}
+.tab.active{color:#E6740A;border-bottom-color:#E6740A;font-weight:600;}
+.tab .badge{display:inline-block;background:#f0f0f0;color:#999;border-radius:10px;padding:1px 8px;font-size:11px;margin-left:4px;}
+.tab.active .badge{background:#fef0e6;color:#E6740A;}
+/* Table */
+.table-wrap{background:#fff;border-radius:0 0 8px 8px;border:1px solid #EBEEF5;border-top:none;overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+thead{background:#fafafa;}
+th{padding:12px 10px;text-align:left;font-weight:600;color:#333;border-bottom:1px solid #EBEEF5;white-space:nowrap;}
+td{padding:10px;border-bottom:1px solid #EBEEF5;color:#606266;}
+tr:hover{background:#fafafa;}
+.tag{display:inline-block;padding:2px 10px;border-radius:4px;font-size:12px;white-space:nowrap;}
+.tag-draft{background:#f4f4f5;color:#909399;}
+.tag-inquiry{background:#ecf5ff;color:#409eff;}
+.tag-quoting{background:#fdf6ec;color:#e6a23c;}
+.tag-quoted{background:#f0f9eb;color:#67c23a;}
+.tag-comparing{background:#f4ecff;color:#9b59b6;}
+.tag-awarded{background:#ecfdf5;color:#13c2c2;}
+.tag-done{background:#f0f9eb;color:#389e0d;}
+.tag-void{background:#fef0f0;color:#f56c6c;}
+.op-btn{padding:4px 12px;border-radius:3px;font-size:12px;cursor:pointer;border:none;margin-right:4px;transition:all .15s;}
+.op-edit{background:#ecf5ff;color:#409eff;}
+.op-edit:hover{background:#409eff;color:#fff;}
+.op-del{background:#fef0f0;color:#f56c6c;}
+.op-del:hover{background:#f56c6c;color:#fff;}
+.op-view{background:#f0f9eb;color:#67c23a;}
+.op-view:hover{background:#67c23a;color:#fff;}
+/* Pagination */
+.pagination{display:flex;align-items:center;justify-content:flex-end;padding:14px 16px;gap:6px;font-size:13px;color:#606266;}
+.pagination span{margin:0 8px;}
+.pg-btn{width:30px;height:30px;border:1px solid #dcdfe6;border-radius:4px;background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;}
+.pg-btn.active{background:#E6740A;color:#fff;border-color:#E6740A;}
+.pg-btn:hover{border-color:#E6740A;color:#E6740A;}
+.pg-btn.active:hover{color:#fff;}
+/* Dialog overlay */
+.overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:200;align-items:center;justify-content:center;}
+.overlay.show{display:flex;}
+.dialog{background:#fff;border-radius:10px;padding:28px 32px;min-width:360px;box-shadow:0 8px 30px rgba(0,0,0,.18);text-align:center;}
+.dialog h4{font-size:16px;margin-bottom:10px;color:#333;}
+.dialog p{font-size:13px;color:#999;margin-bottom:24px;}
+.dialog .dlg-btns{display:flex;gap:12px;justify-content:center;}
+.dialog .dlg-btns .btn{min-width:90px;}
+/* Modal */
+.modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:200;align-items:center;justify-content:center;}
+.modal-overlay.show{display:flex;}
+.modal{background:#fff;border-radius:10px;width:900px;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 8px 30px rgba(0,0,0,.18);}
+.modal-hd{padding:18px 24px;border-bottom:1px solid #EBEEF5;display:flex;align-items:center;justify-content:space-between;}
+.modal-hd h3{font-size:16px;color:#333;}
+.modal-hd .close-btn{width:28px;height:28px;border:none;background:none;font-size:20px;cursor:pointer;color:#999;border-radius:4px;}
+.modal-hd .close-btn:hover{background:#f5f5f5;color:#333;}
+.modal-bd{padding:20px 24px;overflow-y:auto;flex:1;}
+.modal-ft{padding:16px 24px;border-top:1px solid #EBEEF5;display:flex;justify-content:flex-end;gap:10px;}
+.modal-bd table{width:100%;border-collapse:collapse;font-size:13px;}
+.modal-bd th{background:#fafafa;padding:10px;text-align:left;border:1px solid #EBEEF5;font-weight:600;}
+.modal-bd td{padding:8px 10px;border:1px solid #EBEEF5;}
+.modal-bd input,.modal-bd select{width:100%;height:30px;border:1px solid #dcdfe6;border-radius:3px;padding:0 8px;font-size:12px;outline:none;}
+.modal-bd input:focus{border-color:#E6740A;}
+/* Highlight new row */
+@keyframes highlightRow{0%{background:#fff8e1;}100%{background:transparent;}}
+.row-highlight{animation:highlightRow 2s ease;}
+</style>
+</head>
+<body>
+<!-- Sidebar -->
+<div class="sidebar">
+  <div class="logo-area" style="height:auto;flex-direction:column;align-items:center;padding:18px 20px;"><div style="font-size:30px;font-weight:900;font-style:italic;font-family:Arial Black,Arial,sans-serif;color:#E6740A;text-transform:lowercase;letter-spacing:1px;">jereh</div><div style="font-size:13px;color:#333;margin-top:6px;">杰瑞自动询比价系统</div></div>
+  <ul class="menu">
+    <li class="active"><span class="dot"></span><a href="自动询比价智能体-询比价首页-原型.html" style="color:inherit;text-decoration:none;">询价单管理</a></li>
+    <li><span class="dot"></span><a href="自动询比价智能体-供应商组维护-原型.html" style="color:inherit;text-decoration:none;">供应商组维护</a></li>
+    <li><span class="dot"></span><a href="自动询比价智能体-采购员信息维护-原型.html" style="color:inherit;text-decoration:none;">采购员信息维护</a></li>
+    <li><span class="dot"></span><a href="自动询比价智能体-系统管理-原型.html" style="color:inherit;text-decoration:none;">系统管理</a></li>
+  </ul>
+</div>
+<!-- Main -->
+<div class="main">
+  <!-- Topbar -->
+  <div class="topbar">
+    <div class="breadcrumb">询比价管理 / <span>询价单管理</span></div>
+    <div class="user-info"><b>张华(0707)</b> &nbsp;|&nbsp; 102_装备</div>
+  </div>
+  <div class="content">
+    <!-- AI Cards -->
+    <div class="ai-cards">
+      <div class="ai-card" onclick="showModal('aiSupplierModal')">
+        <div class="ai-icon">🤖</div>
+        <h3>智能供应商推荐</h3>
+        <p>基于物料特征、历史交易数据和供应商绩效，AI自动推荐最优供应商组合，提升询价效率与质量。</p>
+      </div>
+      <div class="ai-card" onclick="showModal('aiCompareModal')">
+        <div class="ai-icon">📊</div>
+        <h3>自动比价与策略推荐</h3>
+        <p>AI自动汇总分析供应商报价，结合市场行情与历史价格趋势，智能生成比价报告与采购策略建议。</p>
+      </div>
+    </div>
+    <!-- Filter + Buttons Area -->
+    <div class="filter-area" style="flex-wrap:nowrap;">
+      <div class="filter-item">
+        <label>询价单编号</label>
+        <input type="text" placeholder="请输入" id="filterNo" style="min-width:100px;">
+      </div>
+      <div class="filter-item">
+        <label>询价单状态</label>
+        <select id="filterStatus" style="min-width:90px;">
+          <option value="">全部</option>
+          <option>草稿</option>
+          <option>询价中</option>
+          <option>报价中</option>
+          <option>报价完成</option>
+          <option>比价中</option>
+          <option>已定标</option>
+          <option>已完成</option>
+          <option>已作废</option>
+        </select>
+      </div>
+      <div class="filter-item">
+        <label>业务实体</label>
+        <select id="filterEntity" style="min-width:100px;">
+          <option value="">全部</option>
+          <option>102_装备</option>
+          <option>102_机械制造</option>
+        </select>
+      </div>
+      <div class="filter-item">
+        <label>创建日期</label>
+        <input type="date" style="min-width:110px;"> ~ <input type="date" style="min-width:110px;">
+      </div>
+      <button class="btn btn-primary" onclick="doFilter()">查询</button>
+      <button class="btn" onclick="doReset()">重置</button>
+    </div>
+    <div style="display:flex;gap:10px;margin-bottom:16px;">
+      <button class="btn btn-primary" onclick="showModal('erpModal')">自动创建询价单</button>
+      <button class="btn" onclick="showModal('manualModal')">手工创建询价单</button>
+      <button class="btn btn-danger" onclick="alert('请先勾选需要删除的询价单')">批量删除</button>
+      <button class="btn" onclick="alert('请先勾选需要作废的询价单')">批量作废</button>
+    </div>
+    <!-- Tabs -->
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab(this)">全部 <span class="badge" id="badge-all">9</span></div>
+      <div class="tab" onclick="switchTab(this)">草稿 <span class="badge">2</span></div>
+      <div class="tab" onclick="switchTab(this)">进行中 <span class="badge">5</span></div>
+      <div class="tab" onclick="switchTab(this)">已完成 <span class="badge">2</span></div>
+    </div>
+    <!-- Data Table -->
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th><input type="checkbox"></th>
+            <th>状态</th>
+            <th>询价单编号</th>
+            <th>业务实体</th>
+            <th>询价单标题</th>
+            <th>采购员</th>
+            <th>截止日期</th>
+            <th>备注</th>
+            <th>创建人</th>
+            <th>创建日期</th>
+            <th>是否年度</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody">
+          <tr>
+            <td><input type="checkbox"></td>
+            <td><span class="tag tag-draft">草稿</span></td>
+            <td>2604150001</td>
+            <td>102_装备</td>
+            <td>工控机及控制器采购询价</td>
+            <td>张华(0707)</td>
+            <td>2026-04-25</td>
+            <td></td>
+            <td>张华</td>
+            <td>2026-04-15</td>
+            <td>否</td>
+            <td>
+              <button class="op-btn op-edit" onclick="location.href='自动询比价智能体-询价单详情-原型.html'">编辑</button>
+              <button class="op-btn op-del" onclick="doDelete(this)">删除</button>
+            </td>
+          </tr>
+          <tr>
+            <td><input type="checkbox"></td>
+            <td><span class="tag tag-draft">草稿</span></td>
+            <td>2604150002</td>
+            <td>102_装备</td>
+            <td>钢型材采购询价</td>
+            <td>张华(0707)</td>
+            <td>2026-04-28</td>
+            <td></td>
+            <td>张华</td>
+            <td>2026-04-15</td>
+            <td>否</td>
+            <td>
+              <button class="op-btn op-edit" onclick="location.href='自动询比价智能体-询价单详情-原型.html'">编辑</button>
+              <button class="op-btn op-del" onclick="doDelete(this)">删除</button>
+            </td>
+          </tr>
+          <tr>
+            <td><input type="checkbox"></td>
+            <td><span class="tag tag-inquiry">询价中</span></td>
+            <td>2604140003</td>
+            <td>102_机械制造</td>
+            <td>刀具采购询价</td>
+            <td>于芳芳(11213)</td>
+            <td>2026-04-22</td>
+            <td></td>
+            <td>于芳芳</td>
+            <td>2026-04-14</td>
+            <td>否</td>
+            <td><button class="op-btn op-view" onclick="location.href='自动询比价智能体-询价单详情-原型.html'">查看</button></td>
+          </tr>
+          <tr>
+            <td><input type="checkbox"></td>
+            <td><span class="tag tag-quoting">报价中</span></td>
+            <td>2604120004</td>
+            <td>102_装备</td>
+            <td>工控机及控制器年度采购</td>
+            <td>张华(0707)</td>
+            <td>2026-04-20</td>
+            <td>年度框架协议</td>
+            <td>张华</td>
+            <td>2026-04-12</td>
+            <td>是</td>
+            <td><button class="op-btn op-view" onclick="location.href='自动询比价智能体-询价单详情-原型.html'">查看</button></td>
+          </tr>
+          <tr>
+            <td><input type="checkbox"></td>
+            <td><span class="tag tag-quoted">报价完成</span></td>
+            <td>2604100005</td>
+            <td>102_机械制造</td>
+            <td>刀具配件采购询价</td>
+            <td>于芳芳(11213)</td>
+            <td>2026-04-18</td>
+            <td></td>
+            <td>于芳芳</td>
+            <td>2026-04-10</td>
+            <td>否</td>
+            <td><button class="op-btn op-view" onclick="location.href='自动询比价智能体-询价单详情-原型.html'">查看</button></td>
+          </tr>
+          <tr>
+            <td><input type="checkbox"></td>
+            <td><span class="tag tag-comparing">比价中</span></td>
+            <td>2604080006</td>
+            <td>102_装备</td>
+            <td>钢型材采购询价</td>
+            <td>张华(0707)</td>
+            <td>2026-04-16</td>
+            <td>第二轮询价</td>
+            <td>张华</td>
+            <td>2026-04-08</td>
+            <td>否</td>
+            <td><button class="op-btn op-view" onclick="location.href='自动询比价智能体-询价单详情-原型.html'">查看</button></td>
+          </tr>
+          <tr>
+            <td><input type="checkbox"></td>
+            <td><span class="tag tag-awarded">已定标</span></td>
+            <td>2604050007</td>
+            <td>102_机械制造</td>
+            <td>刀具年度采购</td>
+            <td>于芳芳(11213)</td>
+            <td>2026-04-14</td>
+            <td></td>
+            <td>于芳芳</td>
+            <td>2026-04-05</td>
+            <td>是</td>
+            <td><button class="op-btn op-view" onclick="location.href='自动询比价智能体-询价单详情-原型.html'">查看</button></td>
+          </tr>
+          <tr>
+            <td><input type="checkbox"></td>
+            <td><span class="tag tag-done">已完成</span></td>
+            <td>2603280008</td>
+            <td>102_装备</td>
+            <td>工控模块采购询价</td>
+            <td>张华(0707)</td>
+            <td>2026-04-05</td>
+            <td></td>
+            <td>张华</td>
+            <td>2026-03-28</td>
+            <td>否</td>
+            <td><button class="op-btn op-view" onclick="location.href='自动询比价智能体-询价单详情-原型.html'">查看</button></td>
+          </tr>
+          <tr>
+            <td><input type="checkbox"></td>
+            <td><span class="tag tag-void">已作废</span></td>
+            <td>2603250009</td>
+            <td>102_装备</td>
+            <td>测试询价单</td>
+            <td>张华(0707)</td>
+            <td>2026-04-01</td>
+            <td>需求取消</td>
+            <td>张华</td>
+            <td>2026-03-25</td>
+            <td>否</td>
+            <td><button class="op-btn op-view" onclick="location.href='自动询比价智能体-询价单详情-原型.html'">查看</button></td>
+          </tr>
+        </tbody>
+      </table>
+      <!-- Pagination -->
+      <div class="pagination">
+        <span>共 <b id="totalCount">9</b> 条</span>
+        <button class="pg-btn">&lt;</button>
+        <button class="pg-btn active">1</button>
+        <button class="pg-btn">2</button>
+        <button class="pg-btn">&gt;</button>
+        <span>10条/页</span>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Delete Confirmation Dialog -->
+<div class="overlay" id="dlg">
+  <div class="dialog">
+    <h4>确认删除</h4>
+    <p>确定要删除该询价单吗？删除后数据将无法恢复。</p>
+    <div class="dlg-btns">
+      <button class="btn" onclick="cancelDel()">取消</button>
+      <button class="btn btn-primary" onclick="confirmDel()">确定</button>
+    </div>
+  </div>
+</div>
+
+<!-- ERP Modal - 自动创建询价单 -->
+<div class="modal-overlay" id="erpModal">
+  <div class="modal">
+    <div class="modal-hd">
+      <h3>待生成询价单</h3>
+      <button class="close-btn" onclick="hideModal('erpModal')">&times;</button>
+    </div>
+    <div class="modal-bd">
+      <p style="font-size:13px;color:#999;margin-bottom:14px;">以下为ERP系统推送的待采购物料，请确认后自动生成询价单。</p>
+      <table>
+        <thead>
+          <tr>
+            <th><input type="checkbox" checked></th>
+            <th>业务实体</th>
+            <th>物料编码</th>
+            <th>物料名称</th>
+            <th>需求数量</th>
+            <th>单位</th>
+            <th>需求日期</th>
+            <th>采购分类</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><input type="checkbox" checked></td>
+            <td>102_装备</td>
+            <td>C050066547</td>
+            <td>8路模拟量输出(HS)</td>
+            <td>10</td>
+            <td>个</td>
+            <td>2026-05-01</td>
+            <td>工控机及控制器</td>
+          </tr>
+          <tr>
+            <td><input type="checkbox" checked></td>
+            <td>102_装备</td>
+            <td>C050086211</td>
+            <td>高速计数模块</td>
+            <td>5</td>
+            <td>个</td>
+            <td>2026-05-01</td>
+            <td>工控机及控制器</td>
+          </tr>
+          <tr>
+            <td><input type="checkbox" checked></td>
+            <td>102_装备</td>
+            <td>C060062042</td>
+            <td>模拟量输入模块</td>
+            <td>8</td>
+            <td>个</td>
+            <td>2026-05-05</td>
+            <td>工控机及控制器</td>
+          </tr>
+          <tr>
+            <td><input type="checkbox" checked></td>
+            <td>102_装备</td>
+            <td>H020000136</td>
+            <td>热轧圆钢 Φ6</td>
+            <td>200</td>
+            <td>米</td>
+            <td>2026-05-10</td>
+            <td>钢型材</td>
+          </tr>
+          <tr>
+            <td><input type="checkbox" checked></td>
+            <td>102_装备</td>
+            <td>H020000135</td>
+            <td>热轧圆钢 Φ190</td>
+            <td>50</td>
+            <td>米</td>
+            <td>2026-05-10</td>
+            <td>钢型材</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="modal-ft">
+      <button class="btn" onclick="hideModal('erpModal')">取消</button>
+      <button class="btn btn-primary" onclick="addRows([
+        {status:'草稿',no:'2604160010',entity:'102_装备',title:'工控机及控制器采购询价(ERP)',buyer:'张华(0707)',deadline:'2026-05-01',remark:'ERP自动生成',creator:'张华',date:'2026-04-16',annual:'否'},
+        {status:'草稿',no:'2604160011',entity:'102_装备',title:'钢型材采购询价(ERP)',buyer:'张华(0707)',deadline:'2026-05-10',remark:'ERP自动生成',creator:'张华',date:'2026-04-16',annual:'否'}
+      ]);hideModal('erpModal')">确认生成</button>
+    </div>
+  </div>
+</div>
+<!-- Manual Create Modal - 手工创建询价单 -->
+<div class="modal-overlay" id="manualModal">
+  <div class="modal">
+    <div class="modal-hd">
+      <h3>手工创建询价单</h3>
+      <button class="close-btn" onclick="hideModal('manualModal')">&times;</button>
+    </div>
+    <div class="modal-bd">
+      <div style="display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap;">
+        <div class="filter-item"><label>询价单标题</label><input type="text" value="刀具采购询价" style="min-width:220px;"></div>
+        <div class="filter-item"><label>业务实体</label>
+          <select><option>102_机械制造</option><option>102_装备</option></select>
+        </div>
+        <div class="filter-item"><label>采购员</label><input type="text" value="于芳芳(11213)" style="min-width:150px;"></div>
+        <div class="filter-item"><label>截止日期</label><input type="date" value="2026-05-10"></div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>业务实体</th>
+            <th>物料编码</th>
+            <th>物料名称</th>
+            <th>规格型号</th>
+            <th>数量</th>
+            <th>单位</th>
+            <th>需求日期</th>
+            <th>采购分类</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>102_机械制造</td>
+            <td>M050003962</td>
+            <td>锁紧销</td>
+            <td>锁紧销;MLP3</td>
+            <td><input type="text" value="20" oninput="this.value=this.value.replace(/[^\d]/g,'')"></td>
+            <td>个</td>
+            <td>2026-05-10</td>
+            <td>刀具</td>
+          </tr>
+          <tr>
+            <td>102_机械制造</td>
+            <td>M050003963</td>
+            <td>刀垫</td>
+            <td>刀垫;TSC44</td>
+            <td><input type="text" value="15" oninput="this.value=this.value.replace(/[^\d]/g,'')"></td>
+            <td>个</td>
+            <td>2026-05-10</td>
+            <td>刀具</td>
+          </tr>
+          <tr>
+            <td><input type="text" placeholder="请选择实体"></td>
+            <td><input type="text" placeholder="物料编码"></td>
+            <td><input type="text" placeholder="物料名称"></td>
+            <td><input type="text" placeholder="规格型号"></td>
+            <td><input type="text" placeholder="数量" oninput="this.value=this.value.replace(/[^\d]/g,'')"></td>
+            <td><input type="text" placeholder="单位"></td>
+            <td><input type="date"></td>
+            <td><input type="text" placeholder="采购分类"></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="modal-ft">
+      <button class="btn" onclick="hideModal('manualModal')">取消</button>
+      <button class="btn btn-primary" onclick="addRows([
+        {status:'草稿',no:'2604160012',entity:'102_机械制造',title:'刀具采购询价(手工)',buyer:'于芳芳(11213)',deadline:'2026-05-10',remark:'手工创建',creator:'于芳芳',date:'2026-04-16',annual:'否'}
+      ]);hideModal('manualModal')">创建询价单</button>
+    </div>
+  </div>
+</div>
+<script>
+var pendingDeleteRow = null;
+
+function doDelete(btn) {
+  pendingDeleteRow = btn.closest('tr');
+  document.getElementById('dlg').classList.add('show');
+}
+
+function cancelDel() {
+  pendingDeleteRow = null;
+  document.getElementById('dlg').classList.remove('show');
+}
+
+function confirmDel() {
+  if (pendingDeleteRow) {
+    var title = pendingDeleteRow.cells[4].textContent;
+    pendingDeleteRow.remove();
+    pendingDeleteRow = null;
+    // Update count
+    var tbody = document.getElementById('tableBody');
+    var count = tbody.rows.length;
+    document.getElementById('totalCount').textContent = count;
+    document.getElementById('badge-all').textContent = count;
+  }
+  document.getElementById('dlg').classList.remove('show');
+  alert('删除成功！');
+}
+
+function switchTab(el) {
+  var tabs = document.querySelectorAll('.tab');
+  tabs.forEach(function(t) { t.classList.remove('active'); });
+  el.classList.add('active');
+  var label = el.textContent.trim().split(' ')[0];
+  var rows = document.getElementById('tableBody').rows;
+  var draftStatuses = ['草稿'];
+  var activeStatuses = ['询价中','报价中','报价完成','比价中','已定标'];
+  var doneStatuses = ['已完成','已作废'];
+  var visibleCount = 0;
+  for (var i = 0; i < rows.length; i++) {
+    var st = rows[i].cells[1].textContent.trim();
+    var show = false;
+    if (label === '全部') show = true;
+    else if (label === '草稿') show = draftStatuses.indexOf(st) >= 0;
+    else if (label === '进行中') show = activeStatuses.indexOf(st) >= 0;
+    else if (label === '已完成') show = doneStatuses.indexOf(st) >= 0;
+    rows[i].style.display = show ? '' : 'none';
+    if (show) visibleCount++;
+  }
+  document.getElementById('totalCount').textContent = visibleCount;
+}
+
+function addRows(items) {
+  var tbody = document.getElementById('tableBody');
+  items.forEach(function(item) {
+    var tr = document.createElement('tr');
+    tr.className = 'row-highlight';
+    tr.innerHTML =
+      '<td><input type="checkbox"></td>' +
+      '<td><span class="tag tag-draft">' + item.status + '</span></td>' +
+      '<td>' + item.no + '</td>' +
+      '<td>' + item.entity + '</td>' +
+      '<td>' + item.title + '</td>' +
+      '<td>' + item.buyer + '</td>' +
+      '<td>' + item.deadline + '</td>' +
+      '<td>' + item.remark + '</td>' +
+      '<td>' + item.creator + '</td>' +
+      '<td>' + item.date + '</td>' +
+      '<td>' + item.annual + '</td>' +
+      '<td>' +
+        '<button class="op-btn op-edit" onclick="alert(\'进入编辑页面：' + item.title + '\')">编辑</button>' +
+        '<button class="op-btn op-del" onclick="doDelete(this)">删除</button>' +
+      '</td>';
+    tbody.insertBefore(tr, tbody.firstChild);
+  });
+  // Update count
+  var count = tbody.rows.length;
+  document.getElementById('totalCount').textContent = count;
+  document.getElementById('badge-all').textContent = count;
+  alert('成功生成 ' + items.length + ' 条询价单！');
+}
+
+
+function doFilter() {
+  var status = document.getElementById('filterStatus').value;
+  var entity = document.getElementById('filterEntity').value;
+  var rows = document.getElementById('tableBody').rows;
+  var visibleCount = 0;
+  for (var i = 0; i < rows.length; i++) {
+    var rowStatus = rows[i].cells[1].textContent.trim();
+    var rowEntity = rows[i].cells[3].textContent.trim();
+    var statusMatch = !status || rowStatus === status;
+    var entityMatch = !entity || rowEntity === entity;
+    if (statusMatch && entityMatch) {
+      rows[i].style.display = '';
+      visibleCount++;
+    } else {
+      rows[i].style.display = 'none';
+    }
+  }
+  document.getElementById('totalCount').textContent = visibleCount;
+  document.getElementById('badge-all').textContent = visibleCount;
+}
+
+function doReset() {
+  document.getElementById('filterStatus').selectedIndex = 0;
+  document.getElementById('filterEntity').selectedIndex = 0;
+  var rows = document.getElementById('tableBody').rows;
+  for (var i = 0; i < rows.length; i++) {
+    rows[i].style.display = '';
+  }
+  var count = rows.length;
+  document.getElementById('totalCount').textContent = count;
+  document.getElementById('badge-all').textContent = count;
+}
+
+function showModal(id) {
+  document.getElementById(id).classList.add('show');
+}
+
+function hideModal(id) {
+  document.getElementById(id).classList.remove('show');
+}
+
+// Sidebar menu - navigation via links
+</script>
+
+
+<!-- AI Supplier Recommendation Modal (Chat Style) -->
+<style>
+.chat-modal{width:600px;height:70vh;display:flex;flex-direction:column;border-radius:10px;overflow:hidden;background:#fff;box-shadow:0 8px 30px rgba(0,0,0,.18);}
+.chat-area{flex:1;overflow-y:auto;padding:20px;background:#f5f6fa;}
+.chat-msg{margin-bottom:16px;display:flex;}
+.chat-msg.user{justify-content:flex-end;}
+.chat-msg.ai{justify-content:flex-start;}
+.chat-bubble{max-width:80%;padding:12px 16px;border-radius:12px;font-size:13px;line-height:1.6;}
+.chat-bubble.user-bubble{background:#E6740A;color:#fff;border-radius:12px 12px 0 12px;}
+.chat-bubble.ai-bubble{background:#fff;border:1px solid #EBEEF5;border-radius:12px 12px 12px 0;}
+.chat-input-bar{display:flex;gap:8px;padding:12px 20px;border-top:1px solid #EBEEF5;background:#fff;}
+.chat-input{flex:1;height:36px;border:1px solid #dcdfe6;border-radius:18px;padding:0 16px;font-size:13px;outline:none;}
+.chat-input:focus{border-color:#E6740A;}
+.chat-send-btn{background:#E6740A;color:#fff;border:none;border-radius:18px;padding:8px 18px;font-size:13px;cursor:pointer;transition:all .2s;}
+.chat-send-btn:hover{background:#cf6609;}
+.chat-rec-table{width:100%;border-collapse:collapse;font-size:12px;margin:6px 0 10px;}
+.chat-rec-table th{background:#fafafa;padding:5px 8px;text-align:left;border:1px solid #EBEEF5;font-weight:600;font-size:11px;}
+.chat-rec-table td{padding:4px 8px;border:1px solid #EBEEF5;font-size:12px;}
+</style>
+<div class="modal-overlay" id="aiSupplierModal">
+  <div class="chat-modal">
+    <div class="modal-hd">
+      <h3> 智能供应商推荐</h3>
+      <button class="close-btn" onclick="hideModal('aiSupplierModal')">&times;</button>
+    </div>
+    <div class="chat-area" id="chatArea">
+      <div class="chat-msg ai">
+        <div class="chat-bubble ai-bubble">您好！我是智能供应商推荐助手。请输入您需要查询的四级品类，我将为您推荐ERP内部供应商和联网搜索供应商。</div>
+      </div>
+    </div>
+    <div class="chat-input-bar">
+      <input type="text" class="chat-input" id="aiMsgInput" placeholder="请输入四级品类名称，如：工控机及控制器..." onkeydown="if(event.key==='Enter'){event.preventDefault();sendAiMsg();}">
+      <button class="chat-send-btn" onclick="sendAiMsg()">发送</button>
+    </div>
+  </div>
+</div>
+<script>
+function sendAiMsg() {
+  var inp = document.getElementById('aiMsgInput');
+  var val = inp.value.trim();
+  if (!val) return;
+  var area = document.getElementById('chatArea');
+  // User bubble
+  var userDiv = document.createElement('div');
+  userDiv.className = 'chat-msg user';
+  userDiv.innerHTML = '<div class="chat-bubble user-bubble">' + val + '</div>';
+  area.appendChild(userDiv);
+  inp.value = '';
+  area.scrollTop = area.scrollHeight;
+  // Thinking indicator
+  var thinkDiv = document.createElement('div');
+  thinkDiv.className = 'chat-msg ai';
+  thinkDiv.id = 'aiThinking';
+  thinkDiv.innerHTML = '<div class="chat-bubble ai-bubble" style="color:#999;">正在搜索中...</div>';
+  area.appendChild(thinkDiv);
+  area.scrollTop = area.scrollHeight;
+  var category = val;
+  setTimeout(function() {
+    var t = document.getElementById('aiThinking');
+    if (t) t.remove();
+    var aiDiv = document.createElement('div');
+    aiDiv.className = 'chat-msg ai';
+    aiDiv.innerHTML = '<div class="chat-bubble ai-bubble">' +
+      '<div style="margin-bottom:4px;">已为您查询 <b style="color:#E6740A;">「' + category + '」</b> 品类的供应商：</div>' +
+      '<div style="font-size:13px;font-weight:600;color:#333;margin:10px 0 4px;"> ERP内部推荐（其他业务实体供应商）</div>' +
+      '<table class="chat-rec-table"><thead><tr><th>供应商编码</th><th>供应商名称</th><th>业务实体</th><th>品类</th></tr></thead><tbody>' +
+      '<tr><td>SUP-101</td><td>北京中科自动化有限公司</td><td>102_机械制造</td><td>工控机及控制器</td></tr>' +
+      '<tr><td>SUP-102</td><td>上海汇川技术有限公司</td><td>102_机械制造</td><td>工控机及控制器</td></tr>' +
+      '</tbody></table>' +
+      '<div style="font-size:13px;font-weight:600;color:#333;margin:10px 0 4px;"> 联网搜索推荐（搜索引擎+天眼查）</div>' +
+      '<table class="chat-rec-table"><thead><tr><th>供应商名称</th><th>主营业务</th><th>注册资本</th><th>来源</th></tr></thead><tbody>' +
+      '<tr><td>深圳市信捷电气有限公司</td><td>工业自动化控制系统</td><td>5000万</td><td>天眼查</td></tr>' +
+      '<tr><td>南京菲尼克斯电气有限公司</td><td>工业连接器、自动化控制器</td><td>1.2亿</td><td>天眼查</td></tr>' +
+      '<tr><td>台达电子工业有限公司</td><td>变频器、伺服系统、PLC</td><td>8000万</td><td>搜索引擎</td></tr>' +
+      '</tbody></table>' +
+      '<div style="font-size:11px;color:#999;margin-top:6px;">您可以继续输入其他品类查询更多供应商。</div>' +
+    '</div>';
+    area.appendChild(aiDiv);
+    area.scrollTop = area.scrollHeight;
+  }, 500);
+}
+</script>
+<div class="modal-overlay" id="aiCompareModal"><div class="chat-modal"><div class="modal-hd"><h3>📊 自动比价与策略推荐</h3><button class="close-btn" onclick="hideModal('aiCompareModal')">&times;</button></div><div class="chat-area" id="compareChatArea"><div class="chat-msg ai"><div class="chat-bubble ai-bubble">您好！我是自动比价与策略推荐助手。<br><br>您当前有以下询价单可进行比价分析：<br><br><b>1.</b> 2604100005 - 刀具配件采购询价（报价完成）<br><b>2.</b> 2604080006 - 钢型材采购询价（比价中）<br><br>请输入询价单编号或序号，我将为您生成比价对比表和谈判策略建议。</div></div></div><div class="chat-input-bar"><input type="text" class="chat-input" id="compareMsgInput" placeholder="请输入询价单编号或序号..." onkeydown="if(event.key==='Enter'){event.preventDefault();sendCompareMsg();}"><button class="chat-send-btn" onclick="sendCompareMsg()">发送</button></div></div></div>
+<script>function sendCompareMsg(){var inp=document.getElementById("compareMsgInput");var val=inp.value.trim();if(!val)return;var area=document.getElementById("compareChatArea");var u=document.createElement("div");u.className="chat-msg user";u.innerHTML='<div class="chat-bubble user-bubble">'+val+'</div>';area.appendChild(u);inp.value="";area.scrollTop=area.scrollHeight;var th=document.createElement("div");th.className="chat-msg ai";th.id="cmpThink";th.innerHTML='<div class="chat-bubble ai-bubble" style="color:#999">正在分析报价数据...</div>';area.appendChild(th);area.scrollTop=area.scrollHeight;setTimeout(function(){var t=document.getElementById("cmpThink");if(t)t.remove();var ai=document.createElement("div");ai.className="chat-msg ai";ai.innerHTML='<div class="chat-bubble ai-bubble"><div style="margin-bottom:8px;font-weight:600"> 询价单 2604100005（刀具配件采购询价）比价分析完成！</div><div style="font-size:13px;font-weight:600;margin:10px 0 4px"> 报价对比摘要</div><table class="chat-rec-table"><thead><tr><th>物料</th><th>西门子R1</th><th>西门子R2</th><th>华锐R1</th><th>华锐R2</th><th>最低价</th><th>推荐</th></tr></thead><tbody><tr><td>锁紧销</td><td>25.00</td><td>22.00</td><td>23.50</td><td>21.00</td><td style="color:#67c23a;font-weight:600">21.00</td><td style="color:#E6740A;font-weight:600">华锐</td></tr><tr><td>刀垫</td><td>18.00</td><td>16.50</td><td>17.00</td><td>15.80</td><td style="color:#67c23a;font-weight:600">15.80</td><td style="color:#E6740A;font-weight:600">华锐</td></tr><tr><td>侧边螺丝</td><td>8.50</td><td>7.80</td><td>9.00</td><td>8.20</td><td style="color:#67c23a;font-weight:600">7.80</td><td style="color:#E6740A;font-weight:600">西门子</td></tr></tbody></table><div style="font-size:13px;font-weight:600;margin:12px 0 4px"> 谈判策略建议</div><div style="font-size:12px;line-height:1.8">1. <b>锁紧销和刀垫</b>：华锐报价最低，建议优先选择，可尝试议价至R2报价的95%<br>2. <b>侧边螺丝</b>：西门子报价最低，可利用整体采购量捆绑谈判<br>3. <b>整体策略</b>：锁紧销+刀垫打包给华锐，侧边螺丝单独与西门子谈判<br>4. <b>议价空间</b>：R1到R2降幅约8-12%，预计还有3-5%议价空间</div><div style="margin-top:10px;padding:8px 12px;background:#fef6f0;border-radius:6px;font-size:12px;font-weight:600;color:#E6740A"> 推荐中标方案：华锐中标锁紧销+刀垫，西门子中标侧边螺丝</div></div>';area.appendChild(ai);area.scrollTop=area.scrollHeight},500)}</script>
+</body>
+</html>

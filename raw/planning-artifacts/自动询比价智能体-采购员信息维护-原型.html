@@ -1,0 +1,266 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>自动询比价智能体 - 采购员信息维护</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:"Microsoft YaHei","PingFang SC",sans-serif;background:#f5f6fa;color:#333;display:flex;min-height:100vh;}
+/* Sidebar */
+.sidebar{width:220px;background:#fff;border-right:1px solid #e8e8e8;display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:100;}
+.logo-area{height:auto;display:flex;flex-direction:column;align-items:center;padding:18px 20px;border-bottom:1px solid #e8e8e8;}
+.logo-area .logo-brand{font-size:30px;font-weight:900;font-style:italic;font-family:Arial Black,Arial,sans-serif;color:#E6740A;text-transform:lowercase;letter-spacing:1px;}
+.logo-area .logo-sub{font-size:13px;color:#333;margin-top:6px;}
+.menu{list-style:none;padding:10px 0;}
+.menu li{padding:12px 20px 12px 24px;cursor:pointer;font-size:14px;color:#666;transition:all .2s;border-left:3px solid transparent;}
+.menu li:hover{background:#fef6f0;color:#E6740A;}
+.menu li.active{background:#fef6f0;color:#E6740A;border-left-color:#E6740A;font-weight:600;}
+.menu li .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:#ccc;margin-right:10px;vertical-align:middle;}
+.menu li.active .dot{background:#E6740A;}
+.menu li:hover .dot{background:#E6740A;}
+/* Main */
+.main{margin-left:220px;flex:1;display:flex;flex-direction:column;min-height:100vh;}
+.topbar{height:60px;background:#fff;border-bottom:1px solid #e8e8e8;display:flex;align-items:center;justify-content:space-between;padding:0 24px;position:sticky;top:0;z-index:90;}
+.breadcrumb{font-size:14px;color:#999;}
+.breadcrumb span{color:#333;font-weight:600;}
+.user-info{font-size:13px;color:#666;}
+.user-info b{color:#E6740A;}
+.content{padding:20px 24px;flex:1;}
+.page-title{font-size:18px;font-weight:600;color:#333;margin-bottom:20px;}
+/* Card */
+.card{background:#fff;border:1px solid #EBEEF5;border-radius:8px;padding:20px 24px;margin-bottom:20px;}
+.card-title{font-size:15px;font-weight:600;color:#333;margin-bottom:16px;padding-left:10px;border-left:3px solid #E6740A;}
+/* Form Grid */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px 32px;}
+.form-item{display:flex;align-items:center;gap:8px;}
+.form-item.full{grid-column:1/-1;}
+.form-label{min-width:120px;font-size:13px;color:#606266;text-align:right;flex-shrink:0;}
+.form-value{font-size:13px;color:#333;}
+.form-input{height:34px;border:1px solid #dcdfe6;border-radius:4px;padding:0 10px;font-size:13px;outline:none;flex:1;min-width:0;}
+.form-input:focus{border-color:#E6740A;}
+.form-input.readonly{background:#f5f7fa;color:#909399;cursor:not-allowed;border-color:#e4e7ed;}
+.form-select{height:34px;border:1px solid #dcdfe6;border-radius:4px;padding:0 8px;font-size:13px;outline:none;flex:1;min-width:0;background:#fff;}
+.form-select:focus{border-color:#E6740A;}
+.form-number{height:34px;border:1px solid #dcdfe6;border-radius:4px;padding:0 10px;font-size:13px;outline:none;width:100px;text-align:center;}
+.form-number:focus{border-color:#E6740A;}
+.form-unit{font-size:13px;color:#909399;margin-left:4px;}
+/* Tag */
+.tag{display:inline-block;padding:2px 10px;border-radius:4px;font-size:12px;white-space:nowrap;}
+.tag-success{background:#f0f9eb;color:#67c23a;}
+.tag-warning{background:#fdf6ec;color:#e6a23c;}
+/* Radio */
+.radio-group{display:flex;gap:20px;align-items:center;}
+.radio-group label{display:flex;align-items:center;gap:5px;font-size:13px;color:#606266;cursor:pointer;}
+.radio-group input[type="radio"]{accent-color:#E6740A;width:15px;height:15px;}
+/* Buttons */
+.btn{padding:8px 18px;border-radius:4px;font-size:13px;cursor:pointer;border:1px solid #dcdfe6;background:#fff;color:#606266;transition:all .2s;}
+.btn:hover{border-color:#E6740A;color:#E6740A;}
+.btn-primary{background:#E6740A;color:#fff;border-color:#E6740A;}
+.btn-primary:hover{background:#cf6609;border-color:#cf6609;color:#fff;}
+.btn-outline{background:#fff;color:#E6740A;border-color:#E6740A;}
+.btn-outline:hover{background:#fef6f0;}
+/* Toast */
+.toast{display:none;position:fixed;top:80px;left:50%;transform:translateX(-50%);background:#67c23a;color:#fff;padding:10px 28px;border-radius:6px;font-size:14px;z-index:999;box-shadow:0 4px 12px rgba(0,0,0,.15);}
+.toast.error{background:#f56c6c;}
+.toast.show{display:block;animation:fadeInOut 2s ease;}
+@keyframes fadeInOut{0%{opacity:0;transform:translateX(-50%) translateY(-10px);}10%{opacity:1;transform:translateX(-50%) translateY(0);}80%{opacity:1;}100%{opacity:0;}}
+</style>
+</head>
+<body>
+<!-- Sidebar -->
+<div class="sidebar">
+  <div class="logo-area">
+    <div class="logo-brand">jereh</div>
+    <div class="logo-sub">杰瑞自动询比价系统</div>
+  </div>
+  <ul class="menu">
+    <li><span class="dot"></span><a href="自动询比价智能体-询比价首页-原型.html" style="color:inherit;text-decoration:none;">询价单管理</a></li>
+    <li><span class="dot"></span><a href="自动询比价智能体-供应商组维护-原型.html" style="color:inherit;text-decoration:none;">供应商组维护</a></li>
+    <li class="active"><span class="dot"></span><a href="自动询比价智能体-采购员信息维护-原型.html" style="color:inherit;text-decoration:none;">采购员信息维护</a></li>
+    <li><span class="dot"></span><a href="自动询比价智能体-系统管理-原型.html" style="color:inherit;text-decoration:none;">系统管理</a></li>
+  </ul>
+</div>
+<!-- Main -->
+<div class="main">
+  <!-- Topbar -->
+  <div class="topbar">
+    <div class="breadcrumb">首页 / <span>采购员信息维护</span></div>
+    <div class="user-info"><b>张华(0707)</b> &nbsp;|&nbsp; 102_装备</div>
+  </div>
+  <div class="content">
+    <div class="page-title">采购员信息维护</div>
+
+    <!-- Section 1: 基本信息 -->
+    <div class="card">
+      <div class="card-title">基本信息</div>
+      <div class="form-grid">
+        <div class="form-item">
+          <span class="form-label">采购员工号</span>
+          <input type="text" class="form-input readonly" value="0707" readonly>
+        </div>
+        <div class="form-item">
+          <span class="form-label">采购员姓名</span>
+          <input type="text" class="form-input readonly" value="张华" readonly>
+        </div>
+        <div class="form-item">
+          <span class="form-label">工作邮箱</span>
+          <span class="form-value">zhanghua@jereh.com</span>
+        </div>
+        <div class="form-item">
+          <span class="form-label">邮箱配置状态</span>
+          <span class="tag tag-success">已配置</span>
+        </div>
+        <div class="form-item">
+          <span class="form-label">最近更新时间</span>
+          <span class="form-value">2026-04-15 10:30:00</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 2: 邮箱配置 -->
+    <div class="card">
+      <div class="card-title">邮箱配置</div>
+      <div class="form-grid">
+        <div class="form-item">
+          <span class="form-label">工作邮箱</span>
+          <input type="email" class="form-input" id="emailAddr" value="zhanghua@jereh.com" placeholder="请输入工作邮箱">
+        </div>
+        <div class="form-item">
+          <span class="form-label">邮箱授权码</span>
+          <input type="password" class="form-input" id="emailAuth" value="********" placeholder="请输入邮箱授权码">
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 3: 邮件服务器配置 -->
+    <div class="card">
+      <div class="card-title">邮件服务器配置</div>
+      <div class="form-grid">
+        <div class="form-item">
+          <span class="form-label">SMTP服务器地址</span>
+          <input type="text" class="form-input" id="smtpHost" value="smtp.jereh.com" placeholder="如 smtp.example.com">
+        </div>
+        <div class="form-item">
+          <span class="form-label">SMTP端口</span>
+          <input type="number" class="form-number" id="smtpPort" value="465">
+        </div>
+        <div class="form-item">
+          <span class="form-label">SMTP加密方式</span>
+          <select class="form-select" id="smtpEnc">
+            <option value="none">无</option>
+            <option value="ssl" selected>SSL</option>
+            <option value="tls">TLS</option>
+          </select>
+        </div>
+        <div class="form-item">
+          <span class="form-label">IMAP服务器地址</span>
+          <input type="text" class="form-input" id="imapHost" value="imap.jereh.com" placeholder="如 imap.example.com">
+        </div>
+        <div class="form-item">
+          <span class="form-label">IMAP端口</span>
+          <input type="number" class="form-number" id="imapPort" value="993">
+        </div>
+        <div class="form-item">
+          <span class="form-label">IMAP加密方式</span>
+          <select class="form-select" id="imapEnc">
+            <option value="none">无</option>
+            <option value="ssl" selected>SSL</option>
+            <option value="tls">TLS</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 4: 供应商推荐个数配置 -->
+    <div class="card">
+      <div class="card-title">供应商推荐个数配置</div>
+      <div class="form-grid">
+        <div class="form-item">
+          <span class="form-label">ERP内部推荐个数</span>
+          <input type="number" class="form-number" id="erpCount" value="5" min="0" max="10">
+          <span class="form-unit">个（0~10）</span>
+        </div>
+        <div class="form-item">
+          <span class="form-label">外部联网推荐个数</span>
+          <input type="number" class="form-number" id="extCount" value="5" min="0" max="10">
+          <span class="form-unit">个（0~10）</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 5: ERP请购池数据抓取设置 -->
+    <div class="card">
+      <div class="card-title">ERP请购池数据抓取设置</div>
+      <div class="form-grid">
+        <div class="form-item full">
+          <span class="form-label">询价单生成方式</span>
+          <div class="radio-group">
+            <label><input type="radio" name="genMode" value="auto"> 自动生成询价单</label>
+            <label><input type="radio" name="genMode" value="preview" checked> 先展示明细再生成询价单</label>
+          </div>
+        </div>
+        <div class="form-item">
+          <span class="form-label">报价单超期月份</span>
+          <input type="number" class="form-number" id="monthVal" value="6" min="0" max="12">
+          <span class="form-unit">月（0~12）</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Button Bar -->
+    <div style="display:flex;gap:10px;margin-top:24px;padding-top:20px;border-top:2px solid #EBEEF5;">
+      <button class="btn btn-primary" onclick="saveAll()">保存所有设置</button>
+      <button class="btn btn-outline" onclick="testConnection()">测试邮箱连接</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+function showToast(msg, isError) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast' + (isError ? ' error' : '') + ' show';
+  setTimeout(function(){ t.className = 'toast'; }, 2000);
+}
+
+function saveAll() {
+  // 验证邮箱配置
+  var email = document.getElementById('emailAddr').value.trim();
+  if (!email) { showToast('请输入工作邮箱', true); return; }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showToast('邮箱格式不正确', true); return; }
+  var auth = document.getElementById('emailAuth').value.trim();
+  if (!auth) { showToast('请输入邮箱授权码', true); return; }
+  // 验证邮件服务器配置
+  var fields = ['smtpHost', 'smtpPort', 'imapHost', 'imapPort'];
+  for (var i = 0; i < fields.length; i++) {
+    if (!document.getElementById(fields[i]).value.trim()) {
+      showToast('请填写所有邮件服务器配置', true); return;
+    }
+  }
+  // 验证供应商推荐个数
+  var erp = parseInt(document.getElementById('erpCount').value);
+  var ext = parseInt(document.getElementById('extCount').value);
+  if (isNaN(erp) || erp < 0 || erp > 10) { showToast('ERP内部推荐个数需在0~10之间', true); return; }
+  if (isNaN(ext) || ext < 0 || ext > 10) { showToast('外部联网推荐个数需在0~10之间', true); return; }
+  // 验证ERP请购池设置
+  var m = parseInt(document.getElementById('monthVal').value);
+  if (isNaN(m) || m < 0 || m > 12) { showToast('报价单超期月份需在0~12之间', true); return; }
+  showToast('所有设置保存成功');
+}
+
+function testConnection() {
+  var email = document.getElementById('emailAddr').value.trim();
+  var auth = document.getElementById('emailAuth').value.trim();
+  if (!email || !auth) { showToast('请先填写邮箱和授权码', true); return; }
+  showToast('邮箱连接测试成功');
+}
+
+// Sidebar menu - navigation via links
+</script>
+</body>
+</html>

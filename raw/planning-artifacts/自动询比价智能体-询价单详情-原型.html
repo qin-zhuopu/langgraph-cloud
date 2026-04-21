@@ -1,0 +1,1285 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>自动询比价智能体 - 询价单详情</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:"Microsoft YaHei","PingFang SC",sans-serif;background:#f5f6fa;color:#333;display:flex;min-height:100vh;}
+/* Sidebar */
+.sidebar{width:220px;background:#fff;border-right:1px solid #e8e8e8;display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:100;}
+.logo-area{height:auto;display:flex;flex-direction:column;align-items:center;padding:18px 20px;border-bottom:1px solid #e8e8e8;}
+.logo-area .logo-text{font-size:30px;font-weight:900;font-style:italic;font-family:Arial Black,Arial,sans-serif;color:#E6740A;text-transform:lowercase;letter-spacing:1px;}
+.logo-area .logo-sub{font-size:13px;color:#333;margin-top:6px;}
+.menu{list-style:none;padding:10px 0;}
+.menu li{padding:12px 20px 12px 24px;cursor:pointer;font-size:14px;color:#666;transition:all .2s;border-left:3px solid transparent;}
+.menu li:hover{background:#fef6f0;color:#E6740A;}
+.menu li.active{background:#fef6f0;color:#E6740A;border-left-color:#E6740A;font-weight:600;}
+.menu li .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:#ccc;margin-right:10px;vertical-align:middle;}
+.menu li.active .dot{background:#E6740A;}
+.menu li:hover .dot{background:#E6740A;}
+/* Main */
+.main{margin-left:220px;flex:1;display:flex;flex-direction:column;min-height:100vh;}
+.topbar{height:60px;background:#fff;border-bottom:1px solid #e8e8e8;display:flex;align-items:center;justify-content:space-between;padding:0 24px;position:sticky;top:0;z-index:90;}
+.breadcrumb{font-size:14px;color:#999;}
+.breadcrumb a{color:#999;text-decoration:none;}
+.breadcrumb a:hover{color:#E6740A;}
+.breadcrumb span{color:#333;font-weight:600;}
+.user-info{font-size:13px;color:#666;}
+.user-info b{color:#E6740A;}
+.content{padding:20px 24px;flex:1;}
+/* Buttons */
+.btn{padding:8px 18px;border-radius:4px;font-size:13px;cursor:pointer;border:1px solid #dcdfe6;background:#fff;color:#606266;transition:all .2s;display:inline-flex;align-items:center;gap:4px;}
+.btn:hover{border-color:#E6740A;color:#E6740A;}
+.btn-primary{background:#E6740A;color:#fff;border-color:#E6740A;}
+.btn-primary:hover{background:#cf6609;border-color:#cf6609;color:#fff;}
+.btn-danger{color:#f56c6c;border-color:#fbc4c4;}
+.btn-danger:hover{background:#f56c6c;color:#fff;border-color:#f56c6c;}
+.btn-outline{color:#606266;border-color:#dcdfe6;background:#fff;}
+.btn-outline:hover{border-color:#E6740A;color:#E6740A;}
+.btn:disabled,.btn[disabled]{opacity:.45;cursor:not-allowed;pointer-events:none;}
+/* Header Card */
+.header-card{background:#fff;border-radius:8px;border:1px solid #EBEEF5;padding:20px 24px;margin-bottom:16px;}
+.header-card .card-title{font-size:16px;font-weight:600;color:#333;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid #EBEEF5;display:flex;align-items:center;justify-content:space-between;}
+.header-card .card-title .actions{display:flex;gap:8px;flex-wrap:wrap;}
+.form-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px 24px;}
+.form-item{display:flex;flex-direction:column;gap:4px;}
+.form-item label{font-size:12px;color:#999;white-space:nowrap;}
+.form-item .val{font-size:13px;color:#333;min-height:32px;display:flex;align-items:center;}
+.form-item input,.form-item select,.form-item textarea{height:32px;border:1px solid #dcdfe6;border-radius:4px;padding:0 8px;font-size:13px;outline:none;color:#333;}
+.form-item input:focus,.form-item select:focus{border-color:#E6740A;}
+.form-item textarea{height:60px;padding:6px 8px;resize:vertical;}
+.form-item .readonly{background:#f5f7fa;color:#606266;border-color:#e4e7ed;}
+.tag{display:inline-block;padding:2px 10px;border-radius:4px;font-size:12px;white-space:nowrap;}
+.tag-draft{background:#f4f4f5;color:#909399;}
+.tag-inquiry{background:#ecf5ff;color:#409eff;}
+.tag-quoting{background:#fdf6ec;color:#e6a23c;}
+.tag-quoted{background:#f0f9eb;color:#67c23a;}
+.tag-comparing{background:#f4ecff;color:#9b59b6;}
+.tag-awarded{background:#ecfdf5;color:#13c2c2;}
+.tag-done{background:#f0f9eb;color:#389e0d;}
+.tag-void{background:#fef0f0;color:#f56c6c;}
+.tag-unquoted{background:#f4f4f5;color:#909399;}
+.tag-quoted-s{background:#f0f9eb;color:#67c23a;}
+.tag-expired{background:#fef0f0;color:#f56c6c;}
+/* Collapse Panel */
+.collapse-panel{background:#fff;border:1px solid #EBEEF5;border-radius:8px;overflow:hidden;}
+.collapse-header{padding:14px 20px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;border-left:3px solid #E6740A;user-select:none;}
+.collapse-header:hover{background:#fef6f0;}
+.collapse-title{font-size:15px;font-weight:600;color:#333;}
+.collapse-title .badge{display:inline-block;background:#fef0e6;color:#E6740A;border-radius:10px;padding:1px 8px;font-size:11px;margin-left:4px;}
+.collapse-arrow{font-size:12px;color:#909399;transition:transform .3s;}
+.collapse-body{border-top:1px solid #EBEEF5;}
+.collapse-body.collapsed{display:none;}
+/* Table */
+.table-wrap{background:#fff;overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+thead{background:#fafafa;}
+th{padding:12px 10px;text-align:left;font-weight:600;color:#333;border-bottom:1px solid #EBEEF5;white-space:nowrap;}
+td{padding:10px;border-bottom:1px solid #EBEEF5;color:#606266;}
+tr:hover{background:#fafafa;}
+.op-btn{padding:4px 12px;border-radius:3px;font-size:12px;cursor:pointer;border:none;margin-right:4px;transition:all .15s;}
+.op-edit{background:#ecf5ff;color:#409eff;}
+.op-edit:hover{background:#409eff;color:#fff;}
+.op-del{background:#fef0f0;color:#f56c6c;}
+.op-del:hover{background:#f56c6c;color:#fff;}
+.op-view{background:#f0f9eb;color:#67c23a;}
+.op-view:hover{background:#67c23a;color:#fff;}
+
+/* Attachment area */
+.attach-area{background:#fff;border-radius:8px;border:1px solid #EBEEF5;padding:16px 20px;}
+.attach-area .attach-title{font-size:14px;font-weight:600;color:#333;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;}
+.attach-list{display:flex;flex-wrap:wrap;gap:10px;}
+.attach-item{display:flex;align-items:center;gap:8px;padding:8px 14px;background:#f5f7fa;border-radius:4px;font-size:12px;color:#606266;border:1px solid #e4e7ed;}
+.attach-item .file-icon{color:#E6740A;font-size:16px;}
+.attach-item .file-del{color:#f56c6c;cursor:pointer;margin-left:6px;font-size:14px;}
+.attach-item .file-del:hover{color:#d32f2f;}
+.upload-btn{display:inline-flex;align-items:center;gap:4px;padding:6px 14px;border:1px dashed #dcdfe6;border-radius:4px;font-size:12px;color:#999;cursor:pointer;transition:all .2s;}
+.upload-btn:hover{border-color:#E6740A;color:#E6740A;}
+/* Empty state */
+.empty-state{padding:60px 20px;text-align:center;color:#c0c4cc;font-size:14px;}
+.empty-state .empty-icon{font-size:48px;margin-bottom:12px;}
+/* AI Recommendation Chat */
+.ai-msg{margin-bottom:16px;display:flex;gap:10px;}
+.ai-avatar{width:32px;height:32px;border-radius:50%;background:#E6740A;color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
+.ai-bubble{background:#f5f7fa;border-radius:0 12px 12px 12px;padding:12px 16px;font-size:13px;color:#333;line-height:1.7;max-width:100%;}
+.rec-supplier-list{margin-top:8px;}
+.rec-supplier-item{display:flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid #EBEEF5;border-radius:4px;margin-bottom:6px;font-size:13px;}
+.rec-supplier-item input[type="checkbox"]{accent-color:#E6740A;width:16px;height:16px;}
+.rec-supplier-item .sup-name{font-weight:600;color:#333;}
+.rec-supplier-item .sup-info{color:#909399;font-size:12px;}
+.rec-tag-erp{display:inline-block;padding:1px 6px;border-radius:3px;font-size:11px;background:#ecf5ff;color:#409eff;margin-left:6px;}
+.rec-tag-web{display:inline-block;padding:1px 6px;border-radius:3px;font-size:11px;background:#fef0e6;color:#E6740A;margin-left:6px;}
+/* Supplier btn bar */
+.supplier-btn-bar{display:flex;gap:10px;margin-bottom:12px;}
+/* Modal */
+.modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:200;align-items:center;justify-content:center;}
+.modal-overlay.show{display:flex;}
+.modal{background:#fff;border-radius:10px;width:960px;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 8px 30px rgba(0,0,0,.18);}
+.modal-hd{padding:18px 24px;border-bottom:1px solid #EBEEF5;display:flex;align-items:center;justify-content:space-between;}
+.modal-hd h3{font-size:16px;color:#333;}
+.modal-hd .close-btn{width:28px;height:28px;border:none;background:none;font-size:20px;cursor:pointer;color:#999;border-radius:4px;}
+.modal-hd .close-btn:hover{background:#f5f5f5;color:#333;}
+.modal-bd{padding:20px 24px;overflow-y:auto;flex:1;}
+.modal-ft{padding:16px 24px;border-top:1px solid #EBEEF5;display:flex;justify-content:flex-end;gap:10px;}
+.modal-bd table{width:100%;border-collapse:collapse;font-size:13px;}
+.modal-bd th{background:#fafafa;padding:10px;text-align:left;border:1px solid #EBEEF5;font-weight:600;}
+.modal-bd td{padding:8px 10px;border:1px solid #EBEEF5;}
+.modal-bd input,.modal-bd select{width:100%;height:30px;border:1px solid #dcdfe6;border-radius:3px;padding:0 8px;font-size:12px;outline:none;}
+.modal-bd input:focus,.modal-bd select:focus{border-color:#E6740A;}
+.modal-form-row{display:flex;gap:16px;margin-bottom:14px;flex-wrap:wrap;}
+.modal-form-item{display:flex;align-items:center;gap:6px;font-size:13px;color:#606266;}
+.modal-form-item label{white-space:nowrap;min-width:70px;text-align:right;}
+.modal-form-item input,.modal-form-item select{height:32px;border:1px solid #dcdfe6;border-radius:4px;padding:0 8px;font-size:12px;outline:none;min-width:160px;}
+.modal-form-item input:focus{border-color:#E6740A;}
+.modal-form-item .readonly-val{background:#f5f7fa;color:#606266;border-color:#e4e7ed;}
+/* Dialog overlay */
+.overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:200;align-items:center;justify-content:center;}
+.overlay.show{display:flex;}
+.dialog{background:#fff;border-radius:10px;padding:28px 32px;min-width:360px;box-shadow:0 8px 30px rgba(0,0,0,.18);text-align:center;}
+.dialog h4{font-size:16px;margin-bottom:10px;color:#333;}
+.dialog p{font-size:13px;color:#999;margin-bottom:24px;}
+.dialog .dlg-btns{display:flex;gap:12px;justify-content:center;}
+.dialog .dlg-btns .btn{min-width:90px;}
+</style>
+</head>
+<body>
+<!-- Sidebar -->
+<div class="sidebar">
+  <div class="logo-area">
+    <div class="logo-text">jereh</div>
+    <div class="logo-sub">杰瑞自动询比价系统</div>
+  </div>
+  <ul class="menu">
+    <li class="active"><span class="dot"></span><a href="自动询比价智能体-询比价首页-原型.html" style="color:inherit;text-decoration:none;">询价单管理</a></li>
+    <li><span class="dot"></span><a href="自动询比价智能体-供应商组维护-原型.html" style="color:inherit;text-decoration:none;">供应商组维护</a></li>
+    <li><span class="dot"></span><a href="自动询比价智能体-采购员信息维护-原型.html" style="color:inherit;text-decoration:none;">采购员信息维护</a></li>
+    <li><span class="dot"></span><a href="自动询比价智能体-系统管理-原型.html" style="color:inherit;text-decoration:none;">系统管理</a></li>
+  </ul>
+</div>
+<!-- Main -->
+<div class="main">
+  <!-- Topbar -->
+  <div class="topbar">
+    <div class="breadcrumb"><a href="#">首页</a> / <a href="#">询价单管理</a> / <span>询价单详情</span></div>
+    <div class="user-info"><b>张华(0707)</b> &nbsp;|&nbsp; 102_装备</div>
+  </div>
+  <div class="content">
+    <!-- Header Info Card -->
+    <div class="header-card">
+      <div class="card-title">
+        <span>📋 询价单详情</span>
+        <div class="actions">
+          <button class="btn btn-primary" onclick="alert('保存成功')">💾 保存</button>
+          <button class="btn btn-outline" onclick="alert('正在发送询价邮件至所有供应商...')">📧 发送询价</button>
+          <button class="btn btn-outline" onclick="alert('确认截止当前轮次报价？')">⏹ 截止报价</button>
+          <button class="btn btn-outline" onclick="alert('正在将报价单导入ERP...')">📥 报价单导入ERP</button>
+          <button class="btn btn-outline" onclick="alert('正在将中标结果导入ERP...')">🏆 中标结果导入ERP</button>
+          <button class="btn btn-danger" onclick="showDialog('voidDlg')">🚫 作废</button>
+          <button class="btn btn-danger" onclick="showDialog('delDlg')">🗑 删除</button>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="form-item">
+          <label>询价单号</label>
+          <div class="val"><input type="text" value="2604150001" class="readonly" readonly style="width:100%;"></div>
+        </div>
+        <div class="form-item">
+          <label>询价单标题</label>
+          <div class="val"><input type="text" value="工控机及控制器采购询价" style="width:100%;"></div>
+        </div>
+        <div class="form-item">
+          <label>采购员</label>
+          <div class="val"><input type="text" value="张华(0707)" class="readonly" readonly style="width:100%;"></div>
+        </div>
+        <div class="form-item">
+          <label>状态</label>
+          <div class="val"><span class="tag tag-comparing">比价中</span></div>
+        </div>
+        <div class="form-item">
+          <label>报价截止时间</label>
+          <div class="val"><input type="datetime-local" value="2026-04-25T18:00:00" style="width:100%;"></div>
+        </div>
+        <div class="form-item">
+          <label>业务实体</label>
+          <div class="val"><input type="text" value="102_装备" class="readonly" readonly style="width:100%;"></div>
+        </div>
+        <div class="form-item">
+          <label>当前轮次</label>
+          <div class="val"><input type="text" value="第3轮" class="readonly" readonly style="width:100%;"></div>
+        </div>
+        <div class="form-item">
+          <label>是否年度谈判</label>
+          <div class="val">
+            <select style="width:100%;"><option selected>否</option><option>是</option></select>
+          </div>
+        </div>
+        <div class="form-item">
+          <label>询价单模版</label>
+          <div class="val">
+            <select style="width:100%;">
+              <option value="">请选择模版</option>
+              <option selected>标准询价模版</option>
+              <option>年度框架协议模版</option>
+              <option>紧急采购模版</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-item" style="grid-column:span 2;">
+          <label>备注</label>
+          <div class="val"><input type="text" placeholder="请输入备注信息" style="width:100%;"></div>
+        </div>
+        <div class="form-item">
+          <label>创建人</label>
+          <div class="val"><input type="text" value="张华" class="readonly" readonly style="width:100%;"></div>
+        </div>
+        <div class="form-item">
+          <label>创建日期</label>
+          <div class="val"><input type="text" value="2026-04-15" class="readonly" readonly style="width:100%;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Collapse Panel: 物料明细 -->
+    <div class="collapse-panel" style="margin-bottom:16px;">
+      <div class="collapse-header" onclick="togglePanel(this)">
+        <span class="collapse-title">物料明细 <span class="badge">3</span></span>
+        <span class="collapse-arrow">▼</span>
+      </div>
+      <div class="collapse-body">
+        <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:40px;"><input type="checkbox"></th>
+              <th>物料编码</th>
+              <th>物料描述</th>
+              <th>物料详细描述</th>
+              <th>数量</th>
+              <th>单位</th>
+              <th>需要日期</th>
+              <th>四级品类</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="materialTbody">
+            <tr>
+              <td><input type="checkbox"></td>
+              <td>C050066547</td>
+              <td>8路模拟量输出(HS)</td>
+              <td>8路模拟量输出(HS)；SM 532；6ES7532-5HF00-0AB0；输出电压/电流可配置；16位分辨率</td>
+              <td><input type="text" value="10" oninput="this.value=this.value.replace(/[^\d.]/g,'')" style="width:60px;height:28px;border:1px solid #dcdfe6;border-radius:3px;padding:0 6px;font-size:12px;text-align:center;"></td>
+              <td>个</td>
+              <td><input type="date" value="2026-05-01" style="height:28px;border:1px solid #dcdfe6;border-radius:3px;padding:0 6px;font-size:12px;"></td>
+              <td>工控机及控制器</td>
+              <td>
+                <button class="op-btn op-del" onclick="alert('确认删除物料行：C050066547？')">删除</button>
+              </td>
+            </tr>
+            <tr>
+              <td><input type="checkbox"></td>
+              <td>C050086211</td>
+              <td>高速计数模块</td>
+              <td>高速计数模块；TM Count 2x24V；6ES7550-1AA01-0AB0；2通道；最大计数频率1MHz</td>
+              <td><input type="text" value="5" oninput="this.value=this.value.replace(/[^\d.]/g,'')" style="width:60px;height:28px;border:1px solid #dcdfe6;border-radius:3px;padding:0 6px;font-size:12px;text-align:center;"></td>
+              <td>个</td>
+              <td><input type="date" value="2026-05-01" style="height:28px;border:1px solid #dcdfe6;border-radius:3px;padding:0 6px;font-size:12px;"></td>
+              <td>工控机及控制器</td>
+              <td>
+                <button class="op-btn op-del" onclick="alert('确认删除物料行：C050086211？')">删除</button>
+              </td>
+            </tr>
+            <tr>
+              <td><input type="checkbox"></td>
+              <td>C060062042</td>
+              <td>模拟量输入模块</td>
+              <td>模拟量输入模块；AI 8xU/I/RTD/TC ST；6ES7531-7KF00-0AB0；8通道；支持热电偶/热电阻</td>
+              <td><input type="text" value="8" oninput="this.value=this.value.replace(/[^\d.]/g,'')" style="width:60px;height:28px;border:1px solid #dcdfe6;border-radius:3px;padding:0 6px;font-size:12px;text-align:center;"></td>
+              <td>个</td>
+              <td><input type="date" value="2026-05-05" style="height:28px;border:1px solid #dcdfe6;border-radius:3px;padding:0 6px;font-size:12px;"></td>
+              <td>工控机及控制器</td>
+              <td>
+                <button class="op-btn op-del" onclick="alert('确认删除物料行：C060062042？')">删除</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div style="padding:12px 16px;display:flex;justify-content:flex-end;">
+          <button class="btn" onclick="addMaterialRow()">+ 新增物料</button>
+        </div>
+      </div>
+      </div>
+    </div>
+
+    <!-- Collapse Panel: 询价单附件 -->
+    <div class="collapse-panel" style="margin-bottom:16px;">
+      <div class="collapse-header" onclick="togglePanel(this)">
+        <span class="collapse-title">询价单附件 <span class="badge">2</span></span>
+        <span class="collapse-arrow">▼</span>
+      </div>
+      <div class="collapse-body">
+      <div class="attach-area" style="border:none;border-radius:0;">
+        <div class="attach-title">
+          <span>询价单附件</span>
+          <label class="upload-btn" onclick="alert('选择文件上传')">📤 上传附件</label>
+        </div>
+        <div class="attach-list">
+          <div class="attach-item">
+            <span class="file-icon">📄</span>
+            <span>工控机技术规格书.pdf</span>
+            <span style="color:#c0c4cc;font-size:11px;">(2.3MB)</span>
+            <span class="file-del" onclick="alert('确认删除？')">✕</span>
+          </div>
+          <div class="attach-item">
+            <span class="file-icon">📊</span>
+            <span>控制器选型参数表.xlsx</span>
+            <span style="color:#c0c4cc;font-size:11px;">(856KB)</span>
+            <span class="file-del" onclick="alert('确认删除？')">✕</span>
+          </div>
+        </div>
+      </div>
+      </div>
+    </div>
+
+    <!-- Collapse Panel: 供应商明细 -->
+    <div class="collapse-panel" style="margin-bottom:16px;">
+      <div class="collapse-header" onclick="togglePanel(this)">
+        <span class="collapse-title">供应商明细 <span class="badge">2</span></span>
+        <span class="collapse-arrow">▼</span>
+      </div>
+      <div class="collapse-body">
+      <div class="table-wrap" style="border-radius:0;border:none;">
+        <div class="supplier-btn-bar" style="padding:12px 16px 0;">
+          <button class="btn btn-primary" onclick="showModal('quoteModal')">✏️ 手工录入报价</button>
+          <button class="btn" onclick="showModal('aiSupplierRecModal');showAiRecDialog()">🤖 智能推荐供应商</button>
+          <button class="btn" onclick="addManualSupplierRow()">+ 手动添加供应商</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th style="width:40px;"><input type="checkbox"></th>
+              <th>供应商编码</th>
+              <th>供应商名称</th>
+              <th>联系人</th>
+              <th>电话</th>
+              <th>邮箱</th>
+              <th>来源</th>
+              <th>报价状态</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><input type="checkbox"></td>
+              <td>SUP-001</td>
+              <td>西门子（中国）有限公司</td>
+              <td><input type="text" value="李明" style="width:100%;height:28px;border:1px solid #dcdfe6;border-radius:3px;padding:0 6px;font-size:12px;outline:none;"></td><td><input type="text" value="010-6476xxxx" style="width:100%;height:28px;border:1px solid #dcdfe6;border-radius:3px;padding:0 6px;font-size:12px;outline:none;"></td><td><input type="text" value="liming@example.com" style="width:100%;height:28px;border:1px solid #dcdfe6;border-radius:3px;padding:0 6px;font-size:12px;outline:none;"></td><td><span style="color:#409eff;font-size:12px;">供应商组匹配</span></td>
+              <td><span class="tag tag-quoted-s">已报价</span></td>
+              <td>
+                <button class="op-btn op-del" onclick="alert('确认删除供应商：西门子（中国）有限公司？')">删除</button>
+              </td>
+            </tr>
+            <tr>
+              <td><input type="checkbox"></td>
+              <td>SUP-002</td>
+              <td>青岛海力泵业有限公司</td>
+              <td><input type="text" value="王芳" style="width:100%;height:28px;border:1px solid #dcdfe6;border-radius:3px;padding:0 6px;font-size:12px;outline:none;"></td><td><input type="text" value="0532-8876xxxx" style="width:100%;height:28px;border:1px solid #dcdfe6;border-radius:3px;padding:0 6px;font-size:12px;outline:none;"></td><td><input type="text" value="wangfang@haili.com" style="width:100%;height:28px;border:1px solid #dcdfe6;border-radius:3px;padding:0 6px;font-size:12px;outline:none;"></td><td><span style="color:#409eff;font-size:12px;">供应商组匹配</span></td>
+              <td><span class="tag tag-quoted-s">已报价</span></td>
+              <td>
+                <button class="op-btn op-del" onclick="alert('确认删除供应商：青岛海力泵业有限公司？')">删除</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div style="background:#fff;border:1px solid #EBEEF5;border-radius:8px;padding:16px 20px;margin-top:16px;">
+        <div style="font-size:14px;font-weight:600;color:#333;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">
+          <span id="quoteDetailTitle">供应商报价详情  西门子（中国）有限公司（第3轮）</span>
+          <select style="height:30px;border:1px solid #dcdfe6;border-radius:4px;padding:0 8px;font-size:12px;" onchange="switchSupplierQuote(this.value)">
+            <option>西门子（中国）有限公司</option>
+            <option>青岛海力泵业有限公司</option>
+          </select>
+        </div>
+
+        <!-- 第3轮报价 -->
+        <div style="margin-bottom:16px;">
+          <div style="font-size:13px;font-weight:600;color:#333;margin-bottom:8px;padding:8px 12px;background:#fafafa;border-radius:4px;">
+            第3轮报价 <span id="quoteR3Time" style="font-size:11px;color:#909399;font-weight:normal;">（2026-04-20 09:15:33）</span>
+          </div>
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead style="background:#fafafa;">
+              <tr>
+                <th style="padding:10px;border:1px solid #EBEEF5;">物料编码</th>
+                <th style="padding:10px;border:1px solid #EBEEF5;">物料描述</th>
+                <th style="padding:10px;border:1px solid #EBEEF5;">数量</th>
+                <th style="padding:10px;border:1px solid #EBEEF5;">单位</th>
+                <th style="padding:10px;border:1px solid #EBEEF5;">报价含税单价</th>
+                <th style="padding:10px;border:1px solid #EBEEF5;">报价含税金额</th>
+                <th style="padding:10px;border:1px solid #EBEEF5;">税率</th>
+                <th style="padding:10px;border:1px solid #EBEEF5;">交货期</th>
+              </tr>
+            </thead>
+            <tbody id="quoteR3Body">
+              <tr>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">C050066547</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">8路模拟量输出(HS)</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">10</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">个</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;color:#E6740A;font-weight:600;">1,050.00</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;color:#E6740A;font-weight:600;">10,500.00</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">0.13</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">25天</td>
+              </tr>
+              <tr>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">C050086211</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">高速计数模块</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">5</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">个</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;color:#E6740A;font-weight:600;">2,200.00</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;color:#E6740A;font-weight:600;">11,000.00</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">0.13</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">25天</td>
+              </tr>
+              <tr>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">C060062042</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">模拟量输入模块</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">8</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">个</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;color:#E6740A;font-weight:600;">1,580.00</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;color:#E6740A;font-weight:600;">12,640.00</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">0.13</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">25天</td>
+              </tr>
+            </tbody>
+          </table>
+          <div style="margin-top:6px;font-size:12px;color:#999;">报价附件：<span id="quoteR3File" style="color:#409eff;cursor:pointer;">西门子报价单_R3.pdf</span> | 报价来源：邮件自动抓取</div>
+        </div>
+
+        <hr style="border:none;border-top:1px dashed #e4e7ed;margin:12px 0;">
+
+        <!-- 第2轮报价 -->
+        <div style="margin-bottom:16px;">
+          <div style="font-size:13px;font-weight:600;color:#333;margin-bottom:8px;padding:8px 12px;background:#fafafa;border-radius:4px;">
+            第2轮报价 <span id="quoteR2Time" style="font-size:11px;color:#909399;font-weight:normal;">（2026-04-18 16:20:45）</span>
+          </div>
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead style="background:#fafafa;">
+              <tr>
+                <th style="padding:10px;border:1px solid #EBEEF5;">物料编码</th>
+                <th style="padding:10px;border:1px solid #EBEEF5;">物料描述</th>
+                <th style="padding:10px;border:1px solid #EBEEF5;">数量</th>
+                <th style="padding:10px;border:1px solid #EBEEF5;">单位</th>
+                <th style="padding:10px;border:1px solid #EBEEF5;">报价含税单价</th>
+                <th style="padding:10px;border:1px solid #EBEEF5;">报价含税金额</th>
+                <th style="padding:10px;border:1px solid #EBEEF5;">税率</th>
+                <th style="padding:10px;border:1px solid #EBEEF5;">交货期</th>
+              </tr>
+            </thead>
+            <tbody id="quoteR2Body">
+              <tr>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">C050066547</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">8路模拟量输出(HS)</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">10</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">个</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;color:#E6740A;font-weight:600;">1,100.00</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;color:#E6740A;font-weight:600;">11,000.00</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">0.13</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">30天</td>
+              </tr>
+              <tr>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">C050086211</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">高速计数模块</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">5</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">个</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;color:#E6740A;font-weight:600;">2,350.00</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;color:#E6740A;font-weight:600;">11,750.00</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">0.13</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">30天</td>
+              </tr>
+              <tr>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">C060062042</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">模拟量输入模块</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">8</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">个</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;color:#E6740A;font-weight:600;">1,650.00</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;color:#E6740A;font-weight:600;">13,200.00</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">0.13</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">30天</td>
+              </tr>
+            </tbody>
+          </table>
+          <div style="margin-top:6px;font-size:12px;color:#999;">报价附件：<span id="quoteR2File" style="color:#409eff;cursor:pointer;">西门子报价单_R2.pdf</span> | 报价来源：邮件自动抓取</div>
+        </div>
+
+        <hr style="border:none;border-top:1px dashed #e4e7ed;margin:12px 0;">
+
+        <!-- 第1轮报价 -->
+        <div style="margin-bottom:16px;">
+          <div style="font-size:13px;font-weight:600;color:#333;margin-bottom:8px;padding:8px 12px;background:#fafafa;border-radius:4px;">
+            第1轮报价 <span id="quoteR1Time" style="font-size:11px;color:#909399;font-weight:normal;">（2026-04-17 10:22:18）</span>
+          </div>
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead style="background:#fafafa;">
+              <tr>
+                <th style="padding:10px;border:1px solid #EBEEF5;">物料编码</th>
+                <th style="padding:10px;border:1px solid #EBEEF5;">物料描述</th>
+                <th style="padding:10px;border:1px solid #EBEEF5;">数量</th>
+                <th style="padding:10px;border:1px solid #EBEEF5;">单位</th>
+                <th style="padding:10px;border:1px solid #EBEEF5;">报价含税单价</th>
+                <th style="padding:10px;border:1px solid #EBEEF5;">报价含税金额</th>
+                <th style="padding:10px;border:1px solid #EBEEF5;">税率</th>
+                <th style="padding:10px;border:1px solid #EBEEF5;">交货期</th>
+              </tr>
+            </thead>
+            <tbody id="quoteR1Body">
+              <tr>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">C050066547</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">8路模拟量输出(HS)</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">10</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">个</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;color:#E6740A;font-weight:600;">1,200.00</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;color:#E6740A;font-weight:600;">12,000.00</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">0.13</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">30天</td>
+              </tr>
+              <tr>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">C050086211</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">高速计数模块</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">5</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">个</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;color:#E6740A;font-weight:600;">2,500.00</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;color:#E6740A;font-weight:600;">12,500.00</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">0.13</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">45天</td>
+              </tr>
+              <tr>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">C060062042</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">模拟量输入模块</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">8</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">个</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;color:#E6740A;font-weight:600;">1,800.00</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;color:#E6740A;font-weight:600;">14,400.00</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">0.13</td>
+                <td style="padding:8px 10px;border:1px solid #EBEEF5;">30天</td>
+              </tr>
+            </tbody>
+          </table>
+          <div style="margin-top:6px;font-size:12px;color:#999;">报价附件：<span id="quoteR1File" style="color:#409eff;cursor:pointer;">西门子报价单_R1.pdf</span> | 报价来源：邮件自动抓取</div>
+        </div>
+      </div>
+      </div>
+    </div>
+
+    <!-- Collapse Panel: 报价对比表 -->
+    <div class="collapse-panel" style="margin-bottom:16px;">
+      <div class="collapse-header" onclick="togglePanel(this)">
+        <span class="collapse-title">报价对比表</span>
+        <span class="collapse-arrow">▼</span>
+      </div>
+      <div class="collapse-body">
+      <div class="table-wrap" style="border-radius:0;border:none;">
+        <div style="padding:12px 16px;display:flex;gap:10px;">
+          <button class="btn btn-primary" onclick="alert('正在检索供应商当前轮次报价信息...\n\n发现未报价供应商，正在抓取邮件更新报价...\n\n报价数据更新成功！')">🔄 更新对比表</button> <button class="btn btn-primary" onclick="showModal('strategyModal')">📋 谈判策略建议</button> <button class="btn btn-primary" onclick="alert('报价对比表导出成功！')">📥 导出对比表</button>
+        </div>
+        <div style="overflow-x:auto;">
+        <table style="min-width:1800px;">
+          <thead>
+            <tr>
+              <th style="white-space:nowrap;position:sticky;left:0;background:#fafafa;z-index:1;">物料编码</th>
+              <th style="white-space:nowrap;">物料描述</th>
+              <th style="white-space:nowrap;">物料详细描述</th>
+              <th style="white-space:nowrap;">数量</th>
+              <th style="white-space:nowrap;">需求日期</th>
+              <th style="white-space:nowrap;">单位</th>
+              <th style="white-space:nowrap;">最低价格</th>
+              <th style="white-space:nowrap;">推荐中标供应商</th>
+              <th style="white-space:nowrap;">中标价格</th>
+              <th style="white-space:nowrap;background:#fff8f0;">西门子-最终报价</th>
+              <th style="white-space:nowrap;background:#fff8f0;">西门子-第3轮</th>
+              <th style="white-space:nowrap;background:#fff8f0;">西门子-第2轮</th>
+              <th style="white-space:nowrap;background:#fff8f0;">西门子-第1轮</th>
+              <th style="white-space:nowrap;background:#f0f7ff;">海力泵业-最终报价</th>
+              <th style="white-space:nowrap;background:#f0f7ff;">海力泵业-第3轮</th>
+              <th style="white-space:nowrap;background:#f0f7ff;">海力泵业-第2轮</th>
+              <th style="white-space:nowrap;background:#f0f7ff;">海力泵业-第1轮</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="white-space:nowrap;position:sticky;left:0;background:#fff;z-index:1;">C050066547</td>
+              <td style="white-space:nowrap;">8路模拟量输出(HS)</td>
+              <td style="font-size:12px;color:#909399;max-width:200px;">8路模拟量输出(HS)；SM 532；6ES7532-5HF00-0AB0</td>
+              <td>10</td>
+              <td style="white-space:nowrap;">2026-05-01</td>
+              <td>个</td>
+              <td style="color:#67c23a;font-weight:700;">1,050.00</td>
+              <td style="white-space:nowrap;"><select style="height:28px;border:1px solid #dcdfe6;border-radius:3px;padding:0 4px;font-size:12px;outline:none;" onchange="clearBidPrice(this)"><option selected>西门子</option><option>海力泵业</option></select></td>
+              <td><input type="text" value="1,050.00" style="width:90px;height:28px;border:1px solid #dcdfe6;border-radius:3px;padding:0 6px;font-size:12px;text-align:center;color:#67c23a;font-weight:700;outline:none;"></td></td>
+              <td style="background:#fff8f0;font-weight:600;">1,050.00</td>
+              <td style="background:#fff8f0;">1,050.00</td>
+              <td style="background:#fff8f0;">1,100.00</td>
+              <td style="background:#fff8f0;">1,200.00</td>
+              <td style="background:#f0f7ff;font-weight:600;">1,080.00</td>
+              <td style="background:#f0f7ff;">1,080.00</td>
+              <td style="background:#f0f7ff;">1,150.00</td>
+              <td style="background:#f0f7ff;">1,250.00</td>
+            </tr>
+            <tr>
+              <td style="white-space:nowrap;position:sticky;left:0;background:#fff;z-index:1;">C050086211</td>
+              <td style="white-space:nowrap;">高速计数模块</td>
+              <td style="font-size:12px;color:#909399;max-width:200px;">高速计数模块；TM Count 2x24V；6ES7550-1AA01-0AB0</td>
+              <td>5</td>
+              <td style="white-space:nowrap;">2026-05-01</td>
+              <td>个</td>
+              <td style="color:#67c23a;font-weight:700;">2,200.00</td>
+              <td style="white-space:nowrap;"><select style="height:28px;border:1px solid #dcdfe6;border-radius:3px;padding:0 4px;font-size:12px;outline:none;" onchange="clearBidPrice(this)"><option selected>西门子</option><option>海力泵业</option></select></td>
+              <td><input type="text" value="2,200.00" style="width:90px;height:28px;border:1px solid #dcdfe6;border-radius:3px;padding:0 6px;font-size:12px;text-align:center;color:#67c23a;font-weight:700;outline:none;"></td></td>
+              <td style="background:#fff8f0;font-weight:600;">2,200.00</td>
+              <td style="background:#fff8f0;">2,200.00</td>
+              <td style="background:#fff8f0;">2,350.00</td>
+              <td style="background:#fff8f0;">2,500.00</td>
+              <td style="background:#f0f7ff;font-weight:600;">2,280.00</td>
+              <td style="background:#f0f7ff;">2,280.00</td>
+              <td style="background:#f0f7ff;">2,400.00</td>
+              <td style="background:#f0f7ff;">2,600.00</td>
+            </tr>
+            <tr>
+              <td style="white-space:nowrap;position:sticky;left:0;background:#fff;z-index:1;">C060062042</td>
+              <td style="white-space:nowrap;">模拟量输入模块</td>
+              <td style="font-size:12px;color:#909399;max-width:200px;">模拟量输入模块；AI 8xU/I/RTD/TC ST；6ES7531-7KF00-0AB0</td>
+              <td>8</td>
+              <td style="white-space:nowrap;">2026-05-05</td>
+              <td>个</td>
+              <td style="color:#67c23a;font-weight:700;">1,580.00</td>
+              <td style="white-space:nowrap;"><select style="height:28px;border:1px solid #dcdfe6;border-radius:3px;padding:0 4px;font-size:12px;outline:none;" onchange="clearBidPrice(this)"><option selected>西门子</option><option>海力泵业</option></select></td>
+              <td><input type="text" value="1,580.00" style="width:90px;height:28px;border:1px solid #dcdfe6;border-radius:3px;padding:0 6px;font-size:12px;text-align:center;color:#67c23a;font-weight:700;outline:none;"></td></td>
+              <td style="background:#fff8f0;font-weight:600;">1,580.00</td>
+              <td style="background:#fff8f0;">1,580.00</td>
+              <td style="background:#fff8f0;">1,650.00</td>
+              <td style="background:#fff8f0;">1,800.00</td>
+              <td style="background:#f0f7ff;font-weight:600;">1,620.00</td>
+              <td style="background:#f0f7ff;">1,620.00</td>
+              <td style="background:#f0f7ff;">1,700.00</td>
+              <td style="background:#f0f7ff;">1,850.00</td>
+            </tr>
+          </tbody>
+        </table>
+        </div>
+      </div>
+      </div>
+    </div>
+
+    <!-- Collapse Panel: 邮件记录 -->
+    <div class="collapse-panel" style="margin-bottom:16px;">
+      <div class="collapse-header" onclick="togglePanel(this)">
+        <span class="collapse-title">邮件记录</span>
+        <span class="collapse-arrow">▼</span>
+      </div>
+      <div class="collapse-body">
+      <div class="table-wrap" style="border-radius:0;border:none;">
+        <table>
+          <thead>
+            <tr>
+              <th>发送/接收</th>
+              <th>时间</th>
+              <th>发件人</th>
+              <th>收件人</th>
+              <th>主题</th>
+              <th>状态</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span style="color:#E6740A;font-weight:600;">发送</span></td>
+              <td style="white-space:nowrap;">2026-04-15 14:30:00</td>
+              <td>zhanghua@jereh.com</td>
+              <td>liming@example.com</td>
+              <td>【询价】工控机及控制器采购询价-第1轮</td>
+              <td><span class="tag tag-quoted-s">发送成功</span></td>
+            </tr>
+            <tr>
+              <td><span style="color:#E6740A;font-weight:600;">发送</span></td>
+              <td style="white-space:nowrap;">2026-04-15 14:30:05</td>
+              <td>zhanghua@jereh.com</td>
+              <td>wangfang@haili.com</td>
+              <td>【询价】工控机及控制器采购询价-第1轮</td>
+              <td><span class="tag tag-quoted-s">发送成功</span></td>
+            </tr>
+            <tr>
+              <td><span style="color:#409eff;font-weight:600;">接收</span></td>
+              <td style="white-space:nowrap;">2026-04-17 10:22:18</td>
+              <td>liming@example.com</td>
+              <td>zhanghua@jereh.com</td>
+              <td>RE:【询价】工控机及控制器采购询价-第1轮</td>
+              <td><span class="tag tag-inquiry">已解析</span></td>
+            </tr>
+            <tr>
+              <td><span style="color:#409eff;font-weight:600;">接收</span></td>
+              <td style="white-space:nowrap;">2026-04-17 16:45:33</td>
+              <td>wangfang@haili.com</td>
+              <td>zhanghua@jereh.com</td>
+              <td>RE:【询价】工控机及控制器采购询价-第1轮</td>
+              <td><span class="tag tag-inquiry">已解析</span></td>
+            </tr>
+            <tr>
+              <td><span style="color:#E6740A;font-weight:600;">发送</span></td>
+              <td style="white-space:nowrap;">2026-04-18 09:00:00</td>
+              <td>zhanghua@jereh.com</td>
+              <td>liming@example.com</td>
+              <td>【询价】工控机及控制器采购询价-第2轮</td>
+              <td><span class="tag tag-quoted-s">发送成功</span></td>
+            </tr>
+            <tr>
+              <td><span style="color:#E6740A;font-weight:600;">发送</span></td>
+              <td style="white-space:nowrap;">2026-04-18 09:00:05</td>
+              <td>zhanghua@jereh.com</td>
+              <td>wangfang@haili.com</td>
+              <td>【询价】工控机及控制器采购询价-第2轮</td>
+              <td><span class="tag tag-quoted-s">发送成功</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      </div>
+    </div>
+
+  </div><!-- end content -->
+</div><!-- end main -->
+
+<!-- AI智能供应商推荐弹窗 -->
+<div class="modal-overlay" id="aiSupplierRecModal">
+  <div class="modal" style="width:700px;height:80vh;">
+    <div class="modal-hd">
+      <h3>🤖 智能供应商推荐</h3>
+      <button class="close-btn" onclick="hideModal('aiSupplierRecModal')">&times;</button>
+    </div>
+    <div class="modal-bd" style="padding:0;display:flex;flex-direction:column;overflow:hidden;">
+      <div id="aiRecChat" style="flex:1;overflow-y:auto;padding:20px;">
+        <!-- AI messages will be inserted here -->
+      </div>
+    </div>
+    <div class="modal-ft" id="aiRecFooter" style="display:none;">
+      <button class="btn" onclick="hideModal('aiSupplierRecModal')">取消</button>
+      <button class="btn btn-primary" onclick="addRecommendedSuppliers()">确定添加选中供应商</button>
+    </div>
+  </div>
+</div>
+
+<!-- 手工录入报价弹窗 -->
+<div class="modal-overlay" id="quoteModal">
+  <div class="modal">
+    <div class="modal-hd">
+      <h3>手工录入报价</h3>
+      <button class="close-btn" onclick="hideModal('quoteModal')">&times;</button>
+    </div>
+    <div class="modal-bd">
+      <div class="modal-form-row">
+        <div class="modal-form-item">
+          <label>供应商名称</label>
+          <select id="quoteSupplier" style="min-width:220px;">
+            <option value="西门子（中国）有限公司">西门子（中国）有限公司</option>
+            <option value="青岛海力泵业有限公司">青岛海力泵业有限公司</option>
+          </select>
+        </div>
+        <div class="modal-form-item">
+          <label>报价轮次</label>
+          <input type="text" value="第1轮" class="readonly-val" readonly style="min-width:80px;">
+        </div>
+        <div class="modal-form-item">
+          <label>币种</label>
+          <select style="min-width:100px;">
+            <option selected>人民币</option>
+            <option>美元</option>
+            <option>欧元</option>
+          </select>
+        </div>
+      </div>
+      <p style="font-size:13px;color:#666;margin-bottom:10px;font-weight:600;">报价明细</p>
+      <table>
+        <thead>
+          <tr>
+            <th>物料编码</th>
+            <th>物料描述</th>
+            <th>数量</th>
+            <th>单位</th>
+            <th>报价含税单价</th>
+            <th>报价含税金额</th>
+            <th>税率</th>
+            <th>交货期</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>C050066547</td>
+            <td>8路模拟量输出(HS)</td>
+            <td>10</td>
+            <td>个</td>
+            <td><input type="number" placeholder="请输入" style="width:100px;" oninput="calcAmount(this,10)"></td>
+            <td class="amount-cell">-</td>
+            <td>
+              <select style="width:70px;">
+                <option value="0.13" selected>13%</option>
+                <option value="0.09">9%</option>
+                <option value="0.06">6%</option>
+                <option value="0.03">3%</option>
+                <option value="0.01">1%</option>
+                <option value="0">0%</option>
+              </select>
+            </td>
+            <td><input type="text" placeholder="如：30天" style="width:80px;"></td>
+          </tr>
+          <tr>
+            <td>C050086211</td>
+            <td>高速计数模块</td>
+            <td>5</td>
+            <td>个</td>
+            <td><input type="number" placeholder="请输入" style="width:100px;" oninput="calcAmount(this,5)"></td>
+            <td class="amount-cell">-</td>
+            <td>
+              <select style="width:70px;">
+                <option value="0.13" selected>13%</option>
+                <option value="0.09">9%</option>
+                <option value="0.06">6%</option>
+                <option value="0.03">3%</option>
+                <option value="0.01">1%</option>
+                <option value="0">0%</option>
+              </select>
+            </td>
+            <td><input type="text" placeholder="如：30天" style="width:80px;"></td>
+          </tr>
+          <tr>
+            <td>C060062042</td>
+            <td>模拟量输入模块</td>
+            <td>8</td>
+            <td>个</td>
+            <td><input type="number" placeholder="请输入" style="width:100px;" oninput="calcAmount(this,8)"></td>
+            <td class="amount-cell">-</td>
+            <td>
+              <select style="width:70px;">
+                <option value="0.13" selected>13%</option>
+                <option value="0.09">9%</option>
+                <option value="0.06">6%</option>
+                <option value="0.03">3%</option>
+                <option value="0.01">1%</option>
+                <option value="0">0%</option>
+              </select>
+            </td>
+            <td><input type="text" placeholder="如：30天" style="width:80px;"></td>
+          </tr>
+        </tbody>
+      </table>
+      <div style="margin-top:16px;display:flex;align-items:center;gap:10px;">
+        <span style="font-size:13px;color:#666;font-weight:600;">报价附件</span>
+        <label class="upload-btn" onclick="alert('选择报价附件上传')">📤 上传附件</label>
+      </div>
+    </div>
+    <div class="modal-ft">
+      <button class="btn" onclick="hideModal('quoteModal')">取消</button>
+      <button class="btn btn-primary" onclick="submitQuote()">确认提交</button>
+    </div>
+  </div>
+</div>
+
+<!-- 谈判策略弹窗 -->
+<div class="modal-overlay" id="strategyModal">
+  <div class="modal" style="width:700px;">
+    <div class="modal-hd">
+      <h3>📋 谈判策略建议</h3>
+      <button class="close-btn" onclick="hideModal('strategyModal')">&times;</button>
+    </div>
+    <div class="modal-bd">
+      <div style="font-size:14px;color:#333;line-height:1.8;">
+        <p style="font-weight:600;color:#E6740A;margin-bottom:12px;">询价单：工控机及控制器采购询价（2604150001）</p>
+        <p style="font-weight:600;margin-bottom:8px;">一、整体分析</p>
+        <p>经过3轮询价，两家供应商均有明显降价趋势。西门子整体报价略低于海力泵业，但海力泵业在交货期方面更有优势。</p>
+        <p style="font-weight:600;margin-top:12px;margin-bottom:8px;">二、价格走势</p>
+        <ul style="padding-left:20px;margin-bottom:12px;">
+          <li>西门子3轮降幅：第1轮→第3轮，平均降幅约12.5%</li>
+          <li>海力泵业3轮降幅：第1轮→第3轮，平均降幅约13.2%</li>
+          <li>两家供应商价差逐轮缩小，竞争态势良好</li>
+        </ul>
+        <p style="font-weight:600;margin-bottom:8px;">三、谈判建议</p>
+        <ul style="padding-left:20px;margin-bottom:12px;">
+          <li>建议以西门子第3轮报价为基准，要求海力泵业进一步降价至同等水平</li>
+          <li>可利用海力泵业交货期优势作为谈判筹码，争取西门子缩短交货期</li>
+          <li>建议对C050086211（高速计数模块）重点议价，该物料两家价差最大</li>
+          <li>可考虑分品类定标：西门子中标C050066547和C060062042，海力泵业中标C050086211</li>
+        </ul>
+        <p style="font-weight:600;margin-bottom:8px;">四、推荐方案</p>
+        <p>推荐西门子（中国）有限公司为主要中标供应商，总价34,140.00元，较首轮报价节省4,760.00元（降幅12.2%）。</p>
+      </div>
+    </div>
+    <div class="modal-ft">
+      <button class="btn" onclick="hideModal('strategyModal')">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- 作废确认弹窗 -->
+<div class="overlay" id="voidDlg">
+  <div class="dialog">
+    <h4>确认作废</h4>
+    <p>是否确认作废该询价单？作废后不可恢复。</p>
+    <div class="dlg-btns">
+      <button class="btn" onclick="hideDialog('voidDlg')">取消</button>
+      <button class="btn btn-danger" onclick="hideDialog('voidDlg');alert('询价单已作废')">确定</button>
+    </div>
+  </div>
+</div>
+
+<!-- 删除确认弹窗 -->
+<div class="overlay" id="delDlg">
+  <div class="dialog">
+    <h4>确认删除</h4>
+    <p>是否确认删除该询价单？删除后不可恢复。</p>
+    <div class="dlg-btns">
+      <button class="btn" onclick="hideDialog('delDlg')">取消</button>
+      <button class="btn btn-danger" onclick="hideDialog('delDlg');alert('询价单已删除')">确定</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Collapse panel toggle
+function togglePanel(header) {
+  var body = header.nextElementSibling;
+  var arrow = header.querySelector('.collapse-arrow');
+  if (body.classList.contains('collapsed')) {
+    body.classList.remove('collapsed');
+    arrow.textContent = '▼';
+  } else {
+    body.classList.add('collapsed');
+    arrow.textContent = '▶';
+  }
+}
+
+// Modal show/hide
+function showModal(id) {
+  document.getElementById(id).classList.add('show');
+}
+function hideModal(id) {
+  document.getElementById(id).classList.remove('show');
+}
+
+// Dialog show/hide
+function showDialog(id) {
+  document.getElementById(id).classList.add('show');
+}
+function hideDialog(id) {
+  document.getElementById(id).classList.remove('show');
+}
+
+// Calculate quote amount
+function calcAmount(input, qty) {
+  var price = parseFloat(input.value);
+  var cell = input.closest('tr').querySelector('.amount-cell');
+  if (!isNaN(price) && price > 0) {
+    cell.textContent = (price * qty).toFixed(2);
+    cell.style.color = '#E6740A';
+    cell.style.fontWeight = '600';
+  } else {
+    cell.textContent = '-';
+    cell.style.color = '';
+    cell.style.fontWeight = '';
+  }
+}
+
+// Submit quote
+function submitQuote() {
+  var supplier = document.getElementById('quoteSupplier').value;
+  var inputs = document.querySelectorAll('#quoteModal .modal-bd table input[type="number"]');
+  var allFilled = true;
+  inputs.forEach(function(inp) {
+    if (!inp.value || parseFloat(inp.value) <= 0) allFilled = false;
+  });
+  if (!allFilled) {
+    alert('请填写所有物料的报价含税单价');
+    return;
+  }
+  hideModal('quoteModal');
+  alert('已成功录入 ' + supplier + ' 的报价数据！\n报价来源：手工录入\n报价轮次：第1轮');
+}
+
+
+
+
+
+// AI Supplier Recommendation
+var aiRecSuppliers = {
+  erp: [
+    {code:"SUP-101",name:"济南西门子工业自动化有限公司",contact:"张磊",phone:"0531-8866xxxx",email:"zhanglei@jnsiemens.com",source:"102_机械制造"},
+    {code:"SUP-102",name:"青岛汇川技术有限公司",contact:"刘芳",phone:"0532-8899xxxx",email:"liufang@inovance.com",source:"102_机械制造"},
+    {code:"SUP-103",name:"烟台台达电子有限公司",contact:"陈伟",phone:"0535-6677xxxx",email:"chenwei@delta.com",source:"103_石油装备"}
+  ],
+  web: [
+    {code:"SUP-201",name:"上海ABB工程有限公司",contact:"王丽",phone:"021-6105xxxx",email:"wangli@abb.com",source:"天眼查推荐"},
+    {code:"SUP-202",name:"深圳汇川技术股份有限公司",contact:"赵明",phone:"0755-2979xxxx",email:"zhaoming@inovance.com",source:"搜索引擎推荐"}
+  ]
+};
+
+function showAiRecDialog() {
+  var chat = document.getElementById("aiRecChat");
+  chat.innerHTML = "";
+  document.getElementById("aiRecFooter").style.display = "none";
+
+  setTimeout(function(){
+    addAiMsg(chat, "您好！我是智能供应商推荐助手。正在分析询价单物料的四级品类信息...");
+  }, 300);
+
+  setTimeout(function(){
+    addAiMsg(chat, "检测到当前询价单四级品类为：<b style='color:#E6740A'>工控机及控制器</b><br><br>正在为您搜索ERP内部其他业务实体供应商和联网供应商...");
+  }, 1200);
+
+  setTimeout(function(){
+    var html = "📦 <b>ERP内部推荐</b>（其他业务实体该品类供应商）：<div class='rec-supplier-list'>";
+    aiRecSuppliers.erp.forEach(function(s,i){
+      html += "<div class='rec-supplier-item'><input type='checkbox' id='erp_"+i+"' checked><label for='erp_"+i+"'><span class='sup-name'>"+s.name+"</span><span class='rec-tag-erp'>"+s.source+"</span><br><span class='sup-info'>编码："+s.code+" | 联系人："+s.contact+" | "+s.email+"</span></label></div>";
+    });
+    html += "</div>";
+    addAiMsg(chat, html);
+  }, 2500);
+
+  setTimeout(function(){
+    var html = "🌐 <b>联网搜索推荐</b>（搜索引擎及天眼查等平台）：<div class='rec-supplier-list'>";
+    aiRecSuppliers.web.forEach(function(s,i){
+      html += "<div class='rec-supplier-item'><input type='checkbox' id='web_"+i+"' checked><label for='web_"+i+"'><span class='sup-name'>"+s.name+"</span><span class='rec-tag-web'>"+s.source+"</span><br><span class='sup-info'>编码："+s.code+" | 联系人："+s.contact+" | "+s.email+"</span></label></div>";
+    });
+    html += "</div>";
+    addAiMsg(chat, html);
+
+    document.getElementById("aiRecFooter").style.display = "flex";
+    addAiMsg(chat, "以上是为您推荐的供应商，请勾选需要添加的供应商，点击\u201c确定添加选中供应商\u201d按钮完成添加。");
+  }, 4000);
+}
+
+function addAiMsg(container, html) {
+  var div = document.createElement("div");
+  div.className = "ai-msg";
+  div.innerHTML = "<div class='ai-avatar'>AI</div><div class='ai-bubble'>" + html + "</div>";
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+}
+
+function addRecommendedSuppliers() {
+  var added = 0;
+  var tbody = null;
+  var tables = document.querySelectorAll(".collapse-body table");
+  for (var t = 0; t < tables.length; t++) {
+    var ths = tables[t].querySelectorAll("th");
+    for (var h = 0; h < ths.length; h++) {
+      if (ths[h].textContent.trim() === "供应商编码") {
+        tbody = tables[t].querySelector("tbody");
+        break;
+      }
+    }
+    if (tbody) break;
+  }
+
+  aiRecSuppliers.erp.forEach(function(s, i) {
+    var cb = document.getElementById("erp_" + i);
+    if (cb && cb.checked) {
+      addSupplierRow(tbody, s, "ERP内部推荐");
+      added++;
+    }
+  });
+
+  aiRecSuppliers.web.forEach(function(s, i) {
+    var cb = document.getElementById("web_" + i);
+    if (cb && cb.checked) {
+      addSupplierRow(tbody, s, "智能推荐");
+      added++;
+    }
+  });
+
+  hideModal("aiSupplierRecModal");
+  if (added > 0) {
+    alert("已成功添加 " + added + " 个推荐供应商到供应商明细中！");
+  } else {
+    alert("未选择任何供应商");
+  }
+}
+
+function addSupplierRow(tbody, s, sourceText) {
+  if (!tbody) return;
+  var tr = document.createElement("tr");
+  tr.innerHTML = "<td><input type='checkbox'></td><td>" + s.code + "</td><td>" + s.name + "</td><td><input type='text' value='" + s.contact + "' style='width:100%;height:28px;border:1px solid #dcdfe6;border-radius:3px;padding:0 6px;font-size:12px;'></td><td><input type='text' value='" + s.phone + "' style='width:100%;height:28px;border:1px solid #dcdfe6;border-radius:3px;padding:0 6px;font-size:12px;'></td><td><input type='text' value='" + s.email + "' style='width:100%;height:28px;border:1px solid #dcdfe6;border-radius:3px;padding:0 6px;font-size:12px;'></td><td><span style='color:#E6740A;font-size:12px;'>" + sourceText + "</span></td><td><span class='tag tag-unquoted'>未报价</span></td><td><button class='op-btn op-del' onclick=\"alert('确认删除供应商：" + s.name + "？')\">删除</button></td>";
+  tbody.appendChild(tr);
+}
+
+// Simulated ERP material data
+var erpMaterials = {
+  "C050066547": {desc:"8路模拟量输出(HS)",detail:"8路模拟量输出(HS)；SM 532；6ES7532-5HF00-0AB0",unit:"个",cat:"工控机及控制器"},
+  "C050086211": {desc:"高速计数模块",detail:"高速计数模块；TM Count 2x24V；6ES7550-1AA01-0AB0",unit:"个",cat:"工控机及控制器"},
+  "C060062042": {desc:"模拟量输入模块",detail:"模拟量输入模块；AI 8xU/I/RTD/TC ST；6ES7531-7KF00-0AB0",unit:"个",cat:"工控机及控制器"},
+  "C070011234": {desc:"数字量输入模块",detail:"数字量输入模块；DI 32x24V DC；6ES7521-1BL00-0AB0",unit:"个",cat:"工控机及控制器"},
+  "C080055678": {desc:"通信处理器",detail:"通信处理器；CP 1543-1；6GK7543-1AX00-0XE0",unit:"个",cat:"工控机及控制器"}
+};
+
+function addMaterialRow() {
+  var tbody = document.getElementById("materialTbody");
+  if (!tbody) { alert("未找到物料表格"); return; }
+  var tr = document.createElement("tr");
+  var cells = [
+    {tag:"td",html:"<input type='checkbox'>"},
+    {tag:"td",html:"<input type='text' class='mat-code' placeholder='如C070011234' onblur='fetchMaterial(this)' style='width:100px;height:28px;border:1px solid #dcdfe6;border-radius:3px;padding:0 6px;font-size:12px;'>"},
+    {tag:"td",cls:"mat-desc",text:"-"},
+    {tag:"td",cls:"mat-detail",text:"-"},
+    {tag:"td",html:"<input type='text' oninput=\"this.value=this.value.replace(/[^\\d.]/g,'')\" style='width:60px;height:28px;border:1px solid #dcdfe6;border-radius:3px;padding:0 6px;font-size:12px;text-align:center;'>"},
+    {tag:"td",cls:"mat-unit",text:"-"},
+    {tag:"td",html:"<input type='date' style='height:28px;border:1px solid #dcdfe6;border-radius:3px;padding:0 6px;font-size:12px;'>"},
+    {tag:"td",cls:"mat-cat",text:"-"},
+    {tag:"td",html:"<button class='op-btn op-del' onclick='delMaterialRow(this)'>删除</button>"}
+  ];
+  for (var i = 0; i < cells.length; i++) {
+    var td = document.createElement("td");
+    if (cells[i].html) td.innerHTML = cells[i].html;
+    if (cells[i].text) td.textContent = cells[i].text;
+    if (cells[i].cls) td.className = cells[i].cls;
+    tr.appendChild(td);
+  }
+  tbody.appendChild(tr);
+}
+
+function fetchMaterial(input) {
+  var code = input.value.trim();
+  var tr = input.closest("tr");
+  if (!code) return;
+  var data = erpMaterials[code];
+  if (data) {
+    tr.querySelector(".mat-desc").textContent = data.desc;
+    tr.querySelector(".mat-detail").textContent = data.detail;
+    tr.querySelector(".mat-unit").textContent = data.unit;
+    tr.querySelector(".mat-cat").textContent = data.cat;
+  } else {
+    tr.querySelector(".mat-desc").textContent = "-";
+    tr.querySelector(".mat-detail").textContent = "-";
+    tr.querySelector(".mat-unit").textContent = "-";
+    tr.querySelector(".mat-cat").textContent = "-";
+    alert("物料编码 " + code + " 在ERP中不存在");
+  }
+}
+
+function delMaterialRow(btn) { btn.closest("tr").remove(); }
+
+// Simulated ERP supplier lookup data
+var erpSupplierData = {
+  "SUP-001": {name:"西门子（中国）有限公司",contact:"李明",phone:"010-6476xxxx",email:"liming@example.com"},
+  "SUP-002": {name:"青岛海力泵业有限公司",contact:"王芳",phone:"0532-8876xxxx",email:"wangfang@haili.com"},
+  "SUP-101": {name:"济南西门子工业自动化有限公司",contact:"张磊",phone:"0531-8866xxxx",email:"zhanglei@jnsiemens.com"},
+  "SUP-102": {name:"青岛汇川技术有限公司",contact:"刘芳",phone:"0532-8899xxxx",email:"liufang@inovance.com"},
+  "SUP-103": {name:"烟台台达电子有限公司",contact:"陈伟",phone:"0535-6677xxxx",email:"chenwei@delta.com"},
+  "SUP-201": {name:"上海ABB工程有限公司",contact:"王丽",phone:"021-6105xxxx",email:"wangli@abb.com"},
+  "SUP-301": {name:"北京和利时系统工程有限公司",contact:"孙强",phone:"010-5898xxxx",email:"sunqiang@hollysys.com"},
+  "SUP-302": {name:"浙江中控技术股份有限公司",contact:"周敏",phone:"0571-8699xxxx",email:"zhoumin@supcon.com"}
+};
+
+function addManualSupplierRow() {
+  var tbody = null;
+  var tables = document.querySelectorAll(".collapse-body table");
+  for (var t = 0; t < tables.length; t++) {
+    var ths = tables[t].querySelectorAll("th");
+    for (var h = 0; h < ths.length; h++) {
+      if (ths[h].textContent.trim() === "供应商编码") { tbody = tables[t].querySelector("tbody"); break; }
+    }
+    if (tbody) break;
+  }
+  if (!tbody) { alert("未找到供应商表格"); return; }
+  var tr = document.createElement("tr");
+  var s = "width:100%;height:28px;border:1px solid #dcdfe6;border-radius:3px;padding:0 6px;font-size:12px;outline:none;";
+  var tds = [];
+  tds.push("<td><input type='checkbox'></td>");
+  tds.push("<td><input type='text' placeholder='如SUP-301' onblur='fetchSupplierInfo(this)' style='width:90px;height:28px;border:1px solid #dcdfe6;border-radius:3px;padding:0 6px;font-size:12px;'></td>");
+  tds.push("<td class='sup-name-cell'>-</td>");
+  tds.push("<td><input type='text' class='sup-contact-input' placeholder='联系人' style='" + s + "'></td>");
+  tds.push("<td><input type='text' class='sup-phone-input' placeholder='电话' style='" + s + "'></td>");
+  tds.push("<td><input type='text' class='sup-email-input' placeholder='邮箱' style='" + s + "'></td>");
+  tds.push("<td><span style='color:#E6740A;font-size:12px;'>手工添加</span></td>");
+  tds.push("<td><span class='tag tag-unquoted'>未报价</span></td>");
+  tds.push("<td><button class='op-btn op-del' onclick='this.closest(\"tr\").remove()'>删除</button></td>");
+  tr.innerHTML = tds.join("");
+  tbody.appendChild(tr);
+}
+
+function fetchSupplierInfo(input) {
+  var code = input.value.trim();
+  var tr = input.closest("tr");
+  if (!code) return;
+  var data = erpSupplierData[code];
+  if (data) {
+    tr.querySelector(".sup-name-cell").textContent = data.name;
+    var ci = tr.querySelector(".sup-contact-input"); if (ci) ci.value = data.contact;
+    var pi = tr.querySelector(".sup-phone-input"); if (pi) pi.value = data.phone;
+    var ei = tr.querySelector(".sup-email-input"); if (ei) ei.value = data.email;
+  } else {
+    tr.querySelector(".sup-name-cell").textContent = "-";
+    var ci2 = tr.querySelector(".sup-contact-input"); if (ci2) ci2.value = "";
+    var pi2 = tr.querySelector(".sup-phone-input"); if (pi2) pi2.value = "";
+    var ei2 = tr.querySelector(".sup-email-input"); if (ei2) ei2.value = "";
+    alert("供应商编码 " + code + " 在ERP中不存在");
+  }
+}
+
+function clearBidPrice(sel) {
+  var tr = sel.closest("tr");
+  var input = tr.querySelector("input[type='text']");
+  if (input) input.value = "";
+}
+// Sidebar menu - navigation via links
+
+// Supplier quote data for dynamic switching
+var supplierQuotes = {
+  "西门子（中国）有限公司": {
+    rounds: [
+      {round:3, time:"2026-04-20 09:15:33", file:"西门子报价单_R3.pdf",
+       items:[{price:"1,050.00",amount:"10,500.00",delivery:"25天"},{price:"2,200.00",amount:"11,000.00",delivery:"25天"},{price:"1,580.00",amount:"12,640.00",delivery:"25天"}]},
+      {round:2, time:"2026-04-18 16:20:45", file:"西门子报价单_R2.pdf",
+       items:[{price:"1,100.00",amount:"11,000.00",delivery:"30天"},{price:"2,350.00",amount:"11,750.00",delivery:"30天"},{price:"1,650.00",amount:"13,200.00",delivery:"30天"}]},
+      {round:1, time:"2026-04-17 10:22:18", file:"西门子报价单_R1.pdf",
+       items:[{price:"1,200.00",amount:"12,000.00",delivery:"30天"},{price:"2,500.00",amount:"12,500.00",delivery:"45天"},{price:"1,800.00",amount:"14,400.00",delivery:"30天"}]}
+    ]
+  },
+  "青岛海力泵业有限公司": {
+    rounds: [
+      {round:3, time:"2026-04-20 11:30:15", file:"海力泵业报价单_R3.pdf",
+       items:[{price:"1,080.00",amount:"10,800.00",delivery:"20天"},{price:"2,280.00",amount:"11,400.00",delivery:"20天"},{price:"1,620.00",amount:"12,960.00",delivery:"20天"}]},
+      {round:2, time:"2026-04-18 14:55:22", file:"海力泵业报价单_R2.pdf",
+       items:[{price:"1,150.00",amount:"11,500.00",delivery:"25天"},{price:"2,400.00",amount:"12,000.00",delivery:"25天"},{price:"1,700.00",amount:"13,600.00",delivery:"25天"}]},
+      {round:1, time:"2026-04-17 16:45:33", file:"海力泵业报价单_R1.pdf",
+       items:[{price:"1,250.00",amount:"12,500.00",delivery:"30天"},{price:"2,600.00",amount:"13,000.00",delivery:"30天"},{price:"1,850.00",amount:"14,800.00",delivery:"30天"}]}
+    ]
+  }
+};
+
+function switchSupplierQuote(supplierName) {
+  var data = supplierQuotes[supplierName];
+  if (!data) return;
+
+  // Update title
+  document.getElementById("quoteDetailTitle").textContent = "供应商报价详情  " + supplierName + "（第" + data.rounds[0].round + "轮）";
+
+  // Update each round
+  var roundIds = ["quoteR3", "quoteR2", "quoteR1"];
+  for (var r = 0; r < data.rounds.length; r++) {
+    var rd = data.rounds[r];
+    var tbody = document.getElementById(roundIds[r] + "Body");
+    if (tbody) {
+      var trs = tbody.querySelectorAll("tr");
+      for (var i = 0; i < trs.length && i < rd.items.length; i++) {
+        var cells = trs[i].querySelectorAll("td");
+        // cells[4]=单价, cells[5]=金额, cells[7]=交货期
+        if (cells[4]) { cells[4].textContent = rd.items[i].price; cells[4].style.color = "#E6740A"; cells[4].style.fontWeight = "600"; }
+        if (cells[5]) { cells[5].textContent = rd.items[i].amount; cells[5].style.color = "#E6740A"; cells[5].style.fontWeight = "600"; }
+        if (cells[7]) cells[7].textContent = rd.items[i].delivery;
+      }
+    }
+    var fileEl = document.getElementById(roundIds[r] + "File");
+    if (fileEl) fileEl.textContent = rd.file;
+    var timeEl = document.getElementById(roundIds[r] + "Time");
+    if (timeEl) timeEl.textContent = "（" + rd.time + "）";
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,636 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>自动询比价智能体 - 供应商组维护</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:"Microsoft YaHei","PingFang SC",sans-serif;background:#f5f6fa;color:#333;display:flex;min-height:100vh;}
+.sidebar{width:220px;background:#fff;border-right:1px solid #e8e8e8;display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:100;}
+.logo-area{height:auto;display:flex;flex-direction:column;align-items:center;padding:18px 20px;border-bottom:1px solid #e8e8e8;}
+.logo-area .logo-brand{font-size:30px;font-weight:900;font-style:italic;font-family:Arial Black,Arial,sans-serif;color:#E6740A;text-transform:lowercase;letter-spacing:1px;}
+.logo-area .logo-sub{font-size:13px;color:#333;margin-top:6px;}
+.menu{list-style:none;padding:10px 0;}
+.menu li{padding:12px 20px 12px 24px;cursor:pointer;font-size:14px;color:#666;transition:all .2s;border-left:3px solid transparent;}
+.menu li:hover{background:#fef6f0;color:#E6740A;}
+.menu li.active{background:#fef6f0;color:#E6740A;border-left-color:#E6740A;font-weight:600;}
+.menu li .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:#ccc;margin-right:10px;vertical-align:middle;}
+.menu li.active .dot{background:#E6740A;}
+.menu li:hover .dot{background:#E6740A;}
+.main{margin-left:220px;flex:1;display:flex;flex-direction:column;min-height:100vh;}
+.topbar{height:60px;background:#fff;border-bottom:1px solid #e8e8e8;display:flex;align-items:center;justify-content:space-between;padding:0 24px;position:sticky;top:0;z-index:90;}
+.breadcrumb{font-size:14px;color:#999;}
+.breadcrumb span{color:#333;font-weight:600;}
+.user-info{font-size:13px;color:#666;}
+.user-info b{color:#E6740A;}
+.content{padding:20px 24px;flex:1;}
+.page-title{font-size:18px;font-weight:600;color:#333;margin-bottom:20px;}
+</style>
+<style>
+/* Table */
+.tbl-wrap{background:#fff;border:1px solid #EBEEF5;border-radius:8px;overflow:hidden;}
+.tbl-toolbar{display:flex;align-items:center;gap:10px;padding:14px 16px;flex-wrap:wrap;}
+.tbl-toolbar input[type="text"],.tbl-toolbar select{height:32px;border:1px solid #dcdfe6;border-radius:4px;padding:0 10px;font-size:13px;outline:none;}
+.tbl-toolbar input[type="text"]:focus,.tbl-toolbar select:focus{border-color:#E6740A;}
+.tbl-toolbar select{padding:0 8px;background:#fff;}
+table{width:100%;border-collapse:collapse;}
+th,td{padding:10px 12px;font-size:13px;text-align:left;border-bottom:1px solid #EBEEF5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px;}
+th{background:#fafafa;color:#909399;font-weight:600;position:sticky;top:0;}
+tr:hover td{background:#fef6f0;}
+.link{color:#E6740A;cursor:pointer;text-decoration:none;}
+.link:hover{text-decoration:underline;}
+/* Buttons */
+.btn{padding:7px 16px;border-radius:4px;font-size:13px;cursor:pointer;border:1px solid #dcdfe6;background:#fff;color:#606266;transition:all .2s;display:inline-flex;align-items:center;gap:4px;}
+.btn:hover{border-color:#E6740A;color:#E6740A;}
+.btn-primary{background:#E6740A;color:#fff;border-color:#E6740A;}
+.btn-primary:hover{background:#cf6609;border-color:#cf6609;color:#fff;}
+.btn-outline{background:#fff;color:#E6740A;border-color:#E6740A;}
+.btn-outline:hover{background:#fef6f0;}
+.btn-danger{background:#fff;color:#f56c6c;border-color:#f56c6c;}
+.btn-danger:hover{background:#fef0f0;}
+.btn-sm{padding:5px 12px;font-size:12px;}
+/* Modal */
+.modal-mask{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:200;justify-content:center;align-items:center;}
+.modal-mask.show{display:flex;}
+.modal{background:#fff;border-radius:8px;width:560px;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 8px 24px rgba(0,0,0,.15);}
+.modal-header{padding:16px 20px;border-bottom:1px solid #EBEEF5;font-size:15px;font-weight:600;display:flex;justify-content:space-between;align-items:center;}
+.modal-close{cursor:pointer;font-size:18px;color:#909399;background:none;border:none;}
+.modal-close:hover{color:#E6740A;}
+.modal-body{padding:20px;overflow-y:auto;flex:1;}
+.modal-footer{padding:12px 20px;border-top:1px solid #EBEEF5;display:flex;justify-content:flex-end;gap:10px;}
+/* Form */
+.form-row{display:flex;align-items:center;margin-bottom:14px;gap:8px;}
+.form-row:last-child{margin-bottom:0;}
+.form-lbl{min-width:100px;font-size:13px;color:#606266;text-align:right;flex-shrink:0;}
+.form-lbl .req{color:#f56c6c;margin-right:2px;}
+.form-ctrl{flex:1;}
+.form-ctrl input,.form-ctrl select,.form-ctrl textarea{width:100%;height:34px;border:1px solid #dcdfe6;border-radius:4px;padding:0 10px;font-size:13px;outline:none;}
+.form-ctrl input:focus,.form-ctrl select:focus,.form-ctrl textarea:focus{border-color:#E6740A;}
+.form-ctrl input.readonly{background:#f5f7fa;color:#909399;cursor:not-allowed;border-color:#e4e7ed;}
+.form-ctrl textarea{height:68px;padding:8px 10px;resize:vertical;}
+.form-ctrl select{background:#fff;}
+/* Card for detail */
+.card{background:#fff;border:1px solid #EBEEF5;border-radius:8px;padding:20px 24px;margin-bottom:20px;}
+.card-title{font-size:15px;font-weight:600;color:#333;margin-bottom:16px;padding-left:10px;border-left:3px solid #E6740A;}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 32px;}
+.detail-item{display:flex;align-items:center;gap:8px;}
+.detail-label{min-width:100px;font-size:13px;color:#909399;text-align:right;flex-shrink:0;}
+.detail-value{font-size:13px;color:#333;}
+.form-input{height:34px;border:1px solid #dcdfe6;border-radius:4px;padding:0 10px;font-size:13px;outline:none;}
+.form-input:focus{border-color:#E6740A;}
+.form-input.readonly{background:#f5f7fa;color:#909399;cursor:not-allowed;border-color:#e4e7ed;}
+.form-select{height:34px;border:1px solid #dcdfe6;border-radius:4px;padding:0 8px;font-size:13px;outline:none;background:#fff;}
+.form-select:focus{border-color:#E6740A;}
+/* Pagination */
+.pagination{display:flex;justify-content:flex-end;align-items:center;padding:12px 16px;gap:6px;font-size:13px;color:#606266;}
+.pagination .pg-btn{padding:4px 10px;border:1px solid #dcdfe6;border-radius:4px;cursor:pointer;background:#fff;}
+.pagination .pg-btn.active{background:#E6740A;color:#fff;border-color:#E6740A;}
+.pagination .pg-btn:hover{border-color:#E6740A;color:#E6740A;}
+.pagination .pg-btn.active:hover{color:#fff;}
+/* Toast */
+.toast{display:none;position:fixed;top:80px;left:50%;transform:translateX(-50%);background:#67c23a;color:#fff;padding:10px 28px;border-radius:6px;font-size:14px;z-index:999;box-shadow:0 4px 12px rgba(0,0,0,.15);}
+.toast.error{background:#f56c6c;}
+.toast.show{display:block;animation:fadeInOut 2s ease;}
+@keyframes fadeInOut{0%{opacity:0;transform:translateX(-50%) translateY(-10px);}10%{opacity:1;transform:translateX(-50%) translateY(0);}80%{opacity:1;}100%{opacity:0;}}
+/* Confirm dialog */
+.confirm-mask{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:300;justify-content:center;align-items:center;}
+.confirm-mask.show{display:flex;}
+.confirm-box{background:#fff;border-radius:8px;padding:24px;width:380px;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.15);}
+.confirm-box p{font-size:14px;color:#333;margin-bottom:20px;}
+.confirm-box .btns{display:flex;justify-content:center;gap:12px;}
+/* Hidden */
+.hidden{display:none !important;}
+</style>
+</head>
+<body>
+<!-- Sidebar -->
+<div class="sidebar">
+  <div class="logo-area">
+    <div class="logo-brand">jereh</div>
+    <div class="logo-sub">杰瑞自动询比价系统</div>
+  </div>
+  <ul class="menu">
+    <li><span class="dot"></span><a href="自动询比价智能体-询比价首页-原型.html" style="color:inherit;text-decoration:none;">询价单管理</a></li>
+    <li class="active"><span class="dot"></span><a href="自动询比价智能体-供应商组维护-原型.html" style="color:inherit;text-decoration:none;">供应商组维护</a></li>
+    <li><span class="dot"></span><a href="自动询比价智能体-采购员信息维护-原型.html" style="color:inherit;text-decoration:none;">采购员信息维护</a></li>
+    <li><span class="dot"></span><a href="自动询比价智能体-系统管理-原型.html" style="color:inherit;text-decoration:none;">系统管理</a></li>
+  </ul>
+</div>
+<!-- Main -->
+<div class="main">
+  <div class="topbar">
+    <div class="breadcrumb" id="breadcrumb">首页 / <span>供应商组维护</span></div>
+    <div class="user-info"><b>张华(0707)</b> &nbsp;|&nbsp; 102_装备</div>
+  </div>
+  <div class="content">
+
+    <!-- ========== VIEW 1: 供应商组列表 ========== -->
+    <div id="viewList">
+      <div class="page-title">供应商组维护</div>
+      <div class="tbl-wrap">
+        <div class="tbl-toolbar">
+          <input type="text" id="searchName" placeholder="供应商组名称" style="width:180px;">
+          <select id="filterCategory" style="width:160px;">
+            <option value="">全部四级品类</option>
+            <option value="泵类">泵类</option>
+            <option value="阀门">阀门</option>
+            <option value="轴承">轴承</option>
+            <option value="密封件">密封件</option>
+            <option value="电机">电机</option>
+          </select>
+          <button class="btn btn-primary btn-sm" onclick="filterList()">查询</button>
+          <button class="btn btn-sm" onclick="resetFilter()">重置</button>
+          <span style="flex:1;"></span>
+          <button class="btn btn-primary" onclick="openCreateModal()">新建供应商组</button>
+        </div>
+        <div style="overflow-x:auto;">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:200px;">供应商组名称</th>
+                <th style="width:100px;">采购员</th>
+                <th style="width:120px;">关联四级品类</th>
+                <th style="width:160px;">创建时间</th>
+                <th style="width:160px;">更新时间</th>
+                <th style="width:180px;">操作</th>
+              </tr>
+            </thead>
+            <tbody id="groupTableBody"></tbody>
+          </table>
+        </div>
+        <div class="pagination">
+          <span>共 <b id="totalCount">0</b> 条</span>
+          <span class="pg-btn" onclick="changePage(-1)">&lt;</span>
+          <span class="pg-btn active">1</span>
+          <span class="pg-btn" onclick="changePage(1)">&gt;</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== VIEW 2: 供应商组详情 ========== -->
+    <div id="viewDetail" class="hidden">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+        <button class="btn btn-sm" onclick="backToList()">← 返回列表</button>
+        <span class="page-title" style="margin-bottom:0;" id="detailTitle">供应商组详情</span>
+      </div>
+      <!-- 抬头信息（可编辑） -->
+      <div class="card">
+        <div class="card-title">供应商组信息</div>
+        <div class="detail-grid">
+          <div class="detail-item">
+            <span class="detail-label"><span style="color:#f56c6c;">*</span> 供应商组名称</span>
+            <input type="text" class="form-input" id="dName" style="flex:1;">
+          </div>
+          <div class="detail-item">
+            <span class="detail-label"><span style="color:#f56c6c;">*</span> 采购员</span>
+            <input type="text" class="form-input readonly" id="dBuyer" readonly style="flex:1;">
+          </div>
+          <div class="detail-item">
+            <span class="detail-label"><span style="color:#f56c6c;">*</span> 关联四级品类</span>
+            <select class="form-select" id="dCategory" style="flex:1;">
+              <option value="">请选择四级品类</option>
+              <option value="泵类">泵类</option>
+              <option value="阀门">阀门</option>
+              <option value="轴承">轴承</option>
+              <option value="密封件">密封件</option>
+              <option value="电机">电机</option>
+            </select>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">备注</span>
+            <input type="text" class="form-input" id="dRemark" placeholder="请输入备注信息" style="flex:1;">
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">创建时间</span>
+            <span class="detail-value" id="dCreated">-</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">更新时间</span>
+            <span class="detail-value" id="dUpdated">-</span>
+          </div>
+        </div>
+        <div style="margin-top:16px;padding-top:12px;border-top:1px solid #EBEEF5;">
+          <button class="btn btn-primary btn-sm" onclick="saveGroupHeader()">保存</button>
+        </div>
+      </div>
+      <!-- 供应商明细 -->
+      <div class="tbl-wrap">
+        <div class="tbl-toolbar">
+          <span style="font-size:14px;font-weight:600;color:#333;">供应商明细</span>
+          <span style="flex:1;"></span>
+          <button class="btn btn-outline btn-sm" onclick="exportSuppliers()">导出</button>
+          <button class="btn btn-outline btn-sm" onclick="openImportModal()">批量导入</button>
+          <button class="btn btn-primary btn-sm" onclick="openSupplierModal()">添加供应商</button>
+        </div>
+        <div style="overflow-x:auto;">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:120px;">供应商编码</th>
+                <th style="width:160px;">供应商名称</th>
+                <th style="width:120px;">供应商联系人</th>
+                <th style="width:130px;">联系人电话</th>
+                <th style="width:200px;">供应商邮箱</th>
+                <th style="width:140px;">操作</th>
+              </tr>
+            </thead>
+            <tbody id="supplierTableBody"></tbody>
+          </table>
+        </div>
+        <div class="pagination">
+          <span>共 <b id="supplierCount">0</b> 条</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Modal: 新建/编辑供应商组 -->
+<div class="modal-mask" id="groupModal">
+  <div class="modal">
+    <div class="modal-header"><span id="groupModalTitle">新建供应商组</span><button class="modal-close" onclick="closeGroupModal()">&times;</button></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <span class="form-lbl"><span class="req">*</span>供应商组名称</span>
+        <div class="form-ctrl"><input type="text" id="gName" placeholder="请输入供应商组名称"></div>
+      </div>
+      <div class="form-row">
+        <span class="form-lbl"><span class="req">*</span>采购员</span>
+        <div class="form-ctrl"><input type="text" id="gBuyer" class="readonly" value="张华" readonly></div>
+      </div>
+      <div class="form-row">
+        <span class="form-lbl"><span class="req">*</span>关联四级品类</span>
+        <div class="form-ctrl">
+          <select id="gCategory">
+            <option value="">请选择四级品类</option>
+            <option value="泵类">泵类</option>
+            <option value="阀门">阀门</option>
+            <option value="轴承">轴承</option>
+            <option value="密封件">密封件</option>
+            <option value="电机">电机</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <span class="form-lbl">备注</span>
+        <div class="form-ctrl"><textarea id="gRemark" placeholder="请输入备注信息"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeGroupModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveGroup()">确定</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: 添加/编辑供应商 -->
+<div class="modal-mask" id="supplierModal">
+  <div class="modal">
+    <div class="modal-header"><span id="supplierModalTitle">添加供应商</span><button class="modal-close" onclick="closeSupplierModal()">&times;</button></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <span class="form-lbl"><span class="req">*</span>供应商编码</span>
+        <div class="form-ctrl"><input type="text" id="sCode" placeholder="请输入供应商编码（如V050）" onblur="fetchSupplierName()"></div>
+      </div>
+      <div class="form-row">
+        <span class="form-lbl"><span class="req">*</span>供应商名称</span>
+        <div class="form-ctrl"><input type="text" id="sName" class="readonly" placeholder="根据供应商编码自动获取" readonly></div>
+      </div>
+      <div class="form-row">
+        <span class="form-lbl"><span class="req">*</span>供应商联系人</span>
+        <div class="form-ctrl"><input type="text" id="sContact" placeholder="请输入联系人姓名"></div>
+      </div>
+      <div class="form-row">
+        <span class="form-lbl">联系人电话</span>
+        <div class="form-ctrl"><input type="text" id="sPhone" placeholder="请输入联系人电话"></div>
+      </div>
+      <div class="form-row">
+        <span class="form-lbl"><span class="req">*</span>供应商邮箱</span>
+        <div class="form-ctrl"><input type="text" id="sEmail" placeholder="请输入供应商邮箱"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeSupplierModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveSupplier()">确定</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: 批量导入 -->
+<div class="modal-mask" id="importModal">
+  <div class="modal" style="width:480px;">
+    <div class="modal-header"><span>批量导入供应商</span><button class="modal-close" onclick="closeImportModal()">&times;</button></div>
+    <div class="modal-body" style="text-align:center;padding:30px 20px;">
+      <p style="font-size:13px;color:#606266;margin-bottom:16px;">请下载导入模板，填写供应商信息后上传Excel文件</p>
+      <p style="font-size:12px;color:#909399;margin-bottom:20px;">模板字段：供应商编码、供应商联系人、联系人电话、供应商邮箱<br>（供应商名称根据供应商编码自动从ERP获取）</p>
+      <div style="display:flex;justify-content:center;gap:12px;">
+        <button class="btn btn-outline btn-sm" onclick="showToast('模板下载成功')">下载导入模板</button>
+        <button class="btn btn-primary btn-sm" onclick="simulateImport()">选择文件并导入</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeImportModal()">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm Dialog -->
+<div class="confirm-mask" id="confirmDialog">
+  <div class="confirm-box">
+    <p id="confirmMsg">是否确认删除？</p>
+    <div class="btns">
+      <button class="btn" onclick="closeConfirm()">取消</button>
+      <button class="btn btn-primary" onclick="doConfirm()">确定</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ===== Data =====
+var groups = [
+  {id:1,name:'泵类供应商组A',buyer:'张华',category:'泵类',remark:'常用泵类供应商',created:'2026-03-10 09:00',updated:'2026-04-15 14:30',
+   suppliers:[
+     {code:'V001',name:'山东威达机械有限公司',contact:'李明',phone:'13800001111',email:'liming@weida.com'},
+     {code:'V002',name:'青岛海力泵业有限公司',contact:'王芳',phone:'13800002222',email:'wangfang@haili.com'},
+     {code:'V003',name:'烟台龙泵科技有限公司',contact:'赵强',phone:'13800003333',email:'zhaoqiang@longbeng.com'}
+   ]},
+  {id:2,name:'阀门供应商组',buyer:'张华',category:'阀门',remark:'阀门类供应商',created:'2026-03-12 10:20',updated:'2026-04-14 16:00',
+   suppliers:[
+     {code:'V010',name:'江苏远大阀门集团有限公司',contact:'孙丽',phone:'13900001111',email:'sunli@yuanda.com'},
+     {code:'V011',name:'浙江超达阀门股份有限公司',contact:'周伟',phone:'13900002222',email:'zhouwei@chaoda.com'}
+   ]},
+  {id:3,name:'轴承供应商组',buyer:'张华',category:'轴承',remark:'',created:'2026-03-20 08:45',updated:'2026-04-10 11:20',
+   suppliers:[
+     {code:'V020',name:'洛阳LYC轴承有限公司',contact:'刘洋',phone:'13700001111',email:'liuyang@lyc.com'}
+   ]},
+  {id:4,name:'密封件供应商组',buyer:'张华',category:'密封件',remark:'进口密封件为主',created:'2026-04-01 13:00',updated:'2026-04-18 09:30',
+   suppliers:[]},
+  {id:5,name:'电机供应商组',buyer:'张华',category:'电机',remark:'',created:'2026-04-05 15:10',updated:'2026-04-19 10:00',
+   suppliers:[
+     {code:'V030',name:'山东华力电机集团股份有限公司',contact:'陈刚',phone:'13600001111',email:'chengang@huali.com'},
+     {code:'V031',name:'卧龙电气驱动集团股份有限公司',contact:'吴敏',phone:'13600002222',email:'wumin@wolong.com'}
+   ]}
+];
+var currentGroupId = null;
+var editGroupId = null;
+var editSupplierIdx = -1;
+var confirmCallback = null;
+
+// Simulated ERP supplier name lookup
+var erpSuppliers = {
+  'V001':'山东威达机械有限公司','V002':'青岛海力泵业有限公司','V003':'烟台龙泵科技有限公司',
+  'V010':'江苏远大阀门集团有限公司','V011':'浙江超达阀门股份有限公司',
+  'V020':'洛阳LYC轴承有限公司','V030':'山东华力电机集团股份有限公司','V031':'卧龙电气驱动集团股份有限公司',
+  'V040':'上海日成密封材料有限公司','V050':'南京高精传动设备制造集团有限公司'
+};
+
+function showToast(msg, isError) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast' + (isError ? ' error' : '') + ' show';
+  setTimeout(function(){ t.className = 'toast'; }, 2000);
+}
+
+// ===== List View =====
+function renderList() {
+  var search = document.getElementById('searchName').value.trim().toLowerCase();
+  var cat = document.getElementById('filterCategory').value;
+  var filtered = groups.filter(function(g) {
+    if (search && g.name.toLowerCase().indexOf(search) === -1) return false;
+    if (cat && g.category !== cat) return false;
+    return true;
+  });
+  var tbody = document.getElementById('groupTableBody');
+  tbody.innerHTML = '';
+  document.getElementById('totalCount').textContent = filtered.length;
+  if (filtered.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#909399;padding:40px;">暂无数据</td></tr>';
+    return;
+  }
+  filtered.forEach(function(g) {
+    var tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td><a class="link" onclick="openDetail('+g.id+')">'+g.name+'</a></td>'+
+      '<td>'+g.buyer+'</td>'+
+      '<td>'+g.category+'</td>'+
+      '<td>'+g.created+'</td>'+
+      '<td>'+g.updated+'</td>'+
+      '<td>'+
+        '<button class="btn btn-outline btn-sm" onclick="openDetail('+g.id+')">编辑</button> '+
+        '<button class="btn btn-danger btn-sm" onclick="deleteGroup('+g.id+')">删除</button>'+
+      '</td>';
+    tbody.appendChild(tr);
+  });
+}
+
+function filterList() { renderList(); }
+function resetFilter() {
+  document.getElementById('searchName').value = '';
+  document.getElementById('filterCategory').value = '';
+  renderList();
+}
+function changePage() { showToast('当前为演示数据，仅一页'); }
+
+// ===== Group CRUD =====
+function openCreateModal() {
+  editGroupId = null;
+  document.getElementById('groupModalTitle').textContent = '新建供应商组';
+  document.getElementById('gName').value = '';
+  document.getElementById('gBuyer').value = '张华';
+  document.getElementById('gCategory').value = '';
+  document.getElementById('gRemark').value = '';
+  document.getElementById('groupModal').classList.add('show');
+}
+function closeGroupModal() { document.getElementById('groupModal').classList.remove('show'); }
+function saveGroup() {
+  var name = document.getElementById('gName').value.trim();
+  var cat = document.getElementById('gCategory').value;
+  if (!name) { showToast('请输入供应商组名称', true); return; }
+  if (!cat) { showToast('请选择关联四级品类', true); return; }
+  var now = new Date();
+  var ts = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0')+' '+String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+  if (editGroupId) {
+    var g = groups.find(function(x){return x.id===editGroupId;});
+    g.name = name; g.category = cat; g.remark = document.getElementById('gRemark').value.trim(); g.updated = ts;
+    showToast('供应商组编辑成功');
+  } else {
+    var newId = groups.length ? Math.max.apply(null, groups.map(function(x){return x.id;}))+1 : 1;
+    groups.push({id:newId,name:name,buyer:'张华',category:cat,remark:document.getElementById('gRemark').value.trim(),created:ts,updated:ts,suppliers:[]});
+    showToast('供应商组创建成功');
+  }
+  closeGroupModal();
+  renderList();
+}
+function deleteGroup(id) {
+  document.getElementById('confirmMsg').textContent = '是否确认删除该供应商组？';
+  confirmCallback = function() {
+    groups = groups.filter(function(x){return x.id!==id;});
+    showToast('供应商组删除成功');
+    renderList();
+  };
+  document.getElementById('confirmDialog').classList.add('show');
+}
+
+// ===== Detail View =====
+function openDetail(id) {
+  currentGroupId = id;
+  var g = groups.find(function(x){return x.id===id;});
+  if (!g) return;
+  document.getElementById('viewList').classList.add('hidden');
+  document.getElementById('viewDetail').classList.remove('hidden');
+  document.getElementById('breadcrumb').innerHTML = '首页 / <a class="link" onclick="backToList()">供应商组维护</a> / <span>'+g.name+'</span>';
+  document.getElementById('detailTitle').textContent = g.name;
+  document.getElementById('dName').value = g.name;
+  document.getElementById('dBuyer').value = g.buyer;
+  document.getElementById('dCategory').value = g.category;
+  document.getElementById('dRemark').value = g.remark || '';
+  document.getElementById('dCreated').textContent = g.created;
+  document.getElementById('dUpdated').textContent = g.updated;
+  renderSuppliers();
+}
+function saveGroupHeader() {
+  var name = document.getElementById('dName').value.trim();
+  var cat = document.getElementById('dCategory').value;
+  if (!name) { showToast('请输入供应商组名称', true); return; }
+  if (!cat) { showToast('请选择关联四级品类', true); return; }
+  var g = groups.find(function(x){return x.id===currentGroupId;});
+  var now = new Date();
+  var ts = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0')+' '+String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+  g.name = name; g.category = cat; g.remark = document.getElementById('dRemark').value.trim(); g.updated = ts;
+  document.getElementById('detailTitle').textContent = name;
+  document.getElementById('dUpdated').textContent = ts;
+  document.getElementById('breadcrumb').innerHTML = '首页 / <a class="link" onclick="backToList()">供应商组维护</a> / <span>'+name+'</span>';
+  showToast('供应商组保存成功');
+}
+function backToList() {
+  currentGroupId = null;
+  document.getElementById('viewDetail').classList.add('hidden');
+  document.getElementById('viewList').classList.remove('hidden');
+  document.getElementById('breadcrumb').innerHTML = '首页 / <span>供应商组维护</span>';
+  renderList();
+}
+function renderSuppliers() {
+  var g = groups.find(function(x){return x.id===currentGroupId;});
+  if (!g) return;
+  var tbody = document.getElementById('supplierTableBody');
+  tbody.innerHTML = '';
+  document.getElementById('supplierCount').textContent = g.suppliers.length;
+  if (g.suppliers.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#909399;padding:40px;">暂无供应商明细，请点击"添加供应商"</td></tr>';
+    return;
+  }
+  g.suppliers.forEach(function(s, idx) {
+    var tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td>'+s.code+'</td>'+
+      '<td title="'+s.name+'">'+s.name+'</td>'+
+      '<td>'+s.contact+'</td>'+
+      '<td>'+(s.phone||'-')+'</td>'+
+      '<td>'+s.email+'</td>'+
+      '<td>'+
+        '<button class="btn btn-outline btn-sm" onclick="editSupplier('+idx+')">编辑</button> '+
+        '<button class="btn btn-danger btn-sm" onclick="deleteSupplier('+idx+')">删除</button>'+
+      '</td>';
+    tbody.appendChild(tr);
+  });
+}
+
+// ===== Supplier CRUD =====
+function openSupplierModal() {
+  editSupplierIdx = -1;
+  document.getElementById('supplierModalTitle').textContent = '添加供应商';
+  document.getElementById('sCode').value = '';
+  document.getElementById('sCode').removeAttribute('readonly');
+  document.getElementById('sCode').classList.remove('readonly');
+  document.getElementById('sName').value = '';
+  document.getElementById('sContact').value = '';
+  document.getElementById('sPhone').value = '';
+  document.getElementById('sEmail').value = '';
+  document.getElementById('supplierModal').classList.add('show');
+}
+function editSupplier(idx) {
+  var g = groups.find(function(x){return x.id===currentGroupId;});
+  var s = g.suppliers[idx];
+  editSupplierIdx = idx;
+  document.getElementById('supplierModalTitle').textContent = '编辑供应商';
+  document.getElementById('sCode').value = s.code;
+  document.getElementById('sCode').setAttribute('readonly', true);
+  document.getElementById('sCode').classList.add('readonly');
+  document.getElementById('sName').value = s.name;
+  document.getElementById('sContact').value = s.contact;
+  document.getElementById('sPhone').value = s.phone || '';
+  document.getElementById('sEmail').value = s.email;
+  document.getElementById('supplierModal').classList.add('show');
+}
+function closeSupplierModal() { document.getElementById('supplierModal').classList.remove('show'); }
+function fetchSupplierName() {
+  var code = document.getElementById('sCode').value.trim();
+  if (!code) { document.getElementById('sName').value = ''; return; }
+  if (erpSuppliers[code]) {
+    document.getElementById('sName').value = erpSuppliers[code];
+  } else {
+    document.getElementById('sName').value = '';
+    showToast('该供应商编码在ERP中不存在', true);
+  }
+}
+function saveSupplier() {
+  var code = document.getElementById('sCode').value.trim();
+  var name = document.getElementById('sName').value.trim();
+  var contact = document.getElementById('sContact').value.trim();
+  var email = document.getElementById('sEmail').value.trim();
+  if (!code) { showToast('请输入供应商编码', true); return; }
+  if (!name) { showToast('请先输入有效的供应商编码以获取供应商名称', true); return; }
+  if (!contact) { showToast('请输入供应商联系人', true); return; }
+  if (!email) { showToast('请输入供应商邮箱', true); return; }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showToast('邮箱格式不正确', true); return; }
+  var g = groups.find(function(x){return x.id===currentGroupId;});
+  var obj = {code:code,name:name,contact:contact,phone:document.getElementById('sPhone').value.trim(),email:email};
+  if (editSupplierIdx >= 0) {
+    g.suppliers[editSupplierIdx] = obj;
+    showToast('供应商编辑成功');
+  } else {
+    g.suppliers.push(obj);
+    showToast('供应商添加成功');
+  }
+  closeSupplierModal();
+  renderSuppliers();
+}
+function deleteSupplier(idx) {
+  document.getElementById('confirmMsg').textContent = '是否确认删除该供应商？';
+  confirmCallback = function() {
+    var g = groups.find(function(x){return x.id===currentGroupId;});
+    g.suppliers.splice(idx, 1);
+    showToast('供应商删除成功');
+    renderSuppliers();
+  };
+  document.getElementById('confirmDialog').classList.add('show');
+}
+
+// ===== Import / Export =====
+function openImportModal() { document.getElementById('importModal').classList.add('show'); }
+function closeImportModal() { document.getElementById('importModal').classList.remove('show'); }
+function simulateImport() {
+  closeImportModal();
+  var g = groups.find(function(x){return x.id===currentGroupId;});
+  g.suppliers.push({code:'V040',name:'上海日成密封材料有限公司',contact:'张伟',phone:'13500001111',email:'zhangwei@richeng.com'});
+  renderSuppliers();
+  showToast('导入完成：成功1条，失败0条');
+}
+function exportSuppliers() { showToast('供应商明细导出成功'); }
+
+// ===== Confirm =====
+function closeConfirm() { document.getElementById('confirmDialog').classList.remove('show'); confirmCallback = null; }
+function doConfirm() { if (confirmCallback) confirmCallback(); closeConfirm(); }
+
+// Sidebar menu - navigation via links
+
+// Init
+renderList();
+</script>
+</body>
+</html>

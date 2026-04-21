@@ -1,0 +1,811 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>自动询比价智能体 - 系统管理</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:"Microsoft YaHei","PingFang SC",sans-serif;background:#f5f6fa;color:#333;display:flex;min-height:100vh;}
+/* Sidebar */
+.sidebar{width:220px;background:#fff;border-right:1px solid #e8e8e8;display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:100;}
+.logo-area{height:auto;display:flex;flex-direction:column;align-items:center;padding:18px 20px;border-bottom:1px solid #e8e8e8;}
+.logo-area .logo-brand{font-size:30px;font-weight:900;font-style:italic;font-family:Arial Black,Arial,sans-serif;color:#E6740A;text-transform:lowercase;letter-spacing:1px;}
+.logo-area .logo-sub{font-size:13px;color:#333;margin-top:6px;}
+.menu{list-style:none;padding:10px 0;}
+.menu li{padding:12px 20px 12px 24px;cursor:pointer;font-size:14px;color:#666;transition:all .2s;border-left:3px solid transparent;}
+.menu li:hover{background:#fef6f0;color:#E6740A;}
+.menu li.active{background:#fef6f0;color:#E6740A;border-left-color:#E6740A;font-weight:600;}
+.menu li .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:#ccc;margin-right:10px;vertical-align:middle;}
+.menu li.active .dot{background:#E6740A;}
+.menu li:hover .dot{background:#E6740A;}
+/* Main */
+.main{margin-left:220px;flex:1;display:flex;flex-direction:column;min-height:100vh;}
+.topbar{height:60px;background:#fff;border-bottom:1px solid #e8e8e8;display:flex;align-items:center;justify-content:space-between;padding:0 24px;position:sticky;top:0;z-index:90;}
+.breadcrumb{font-size:14px;color:#999;}
+.breadcrumb span{color:#333;font-weight:600;}
+.user-info{font-size:13px;color:#666;}
+.user-info b{color:#E6740A;}
+.content{padding:20px 24px;flex:1;}
+.page-title{font-size:18px;font-weight:600;color:#333;margin-bottom:20px;}
+/* Tabs */
+.tabs{display:flex;border-bottom:2px solid #EBEEF5;margin-bottom:20px;}
+.tab-item{padding:10px 24px;font-size:14px;color:#666;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .2s;}
+.tab-item:hover{color:#E6740A;}
+.tab-item.active{color:#E6740A;border-bottom-color:#E6740A;font-weight:600;}
+.tab-content{display:none;}
+.tab-content.active{display:block;}
+/* Card */
+.card{background:#fff;border:1px solid #EBEEF5;border-radius:8px;padding:20px 24px;margin-bottom:20px;}
+.card-title{font-size:15px;font-weight:600;color:#333;margin-bottom:16px;padding-left:10px;border-left:3px solid #E6740A;}
+/* Search Bar */
+.search-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px;}
+.search-input{height:34px;border:1px solid #dcdfe6;border-radius:4px;padding:0 10px;font-size:13px;outline:none;width:180px;}
+.search-input:focus{border-color:#E6740A;}
+.search-select{height:34px;border:1px solid #dcdfe6;border-radius:4px;padding:0 8px;font-size:13px;outline:none;min-width:130px;background:#fff;}
+.search-select:focus{border-color:#E6740A;}
+.search-date{height:34px;border:1px solid #dcdfe6;border-radius:4px;padding:0 10px;font-size:13px;outline:none;width:160px;}
+.search-date:focus{border-color:#E6740A;}
+</style>
+</head>
+<body>
+<!-- Sidebar -->
+<div class="sidebar">
+  <div class="logo-area">
+    <div class="logo-brand">jereh</div>
+    <div class="logo-sub">杰瑞自动询比价系统</div>
+  </div>
+  <ul class="menu">
+    <li><span class="dot"></span><a href="自动询比价智能体-询比价首页-原型.html" style="color:inherit;text-decoration:none;">询价单管理</a></li>
+    <li><span class="dot"></span><a href="自动询比价智能体-供应商组维护-原型.html" style="color:inherit;text-decoration:none;">供应商组维护</a></li>
+    <li><span class="dot"></span><a href="自动询比价智能体-采购员信息维护-原型.html" style="color:inherit;text-decoration:none;">采购员信息维护</a></li>
+    <li class="active"><span class="dot"></span><a href="自动询比价智能体-系统管理-原型.html" style="color:inherit;text-decoration:none;">系统管理</a></li>
+  </ul>
+</div>
+<!-- Main -->
+<div class="main">
+  <div class="topbar">
+    <div class="breadcrumb">首页 / <span>系统管理</span></div>
+    <div class="user-info"><b>管理员(admin)</b> &nbsp;|&nbsp; IT管理员</div>
+  </div>
+  <div class="content">
+    <div class="page-title">系统管理</div>
+    <!-- Tabs -->
+    <div class="tabs">
+      <div class="tab-item active" onclick="switchTab(0)">用户管理</div>
+      <div class="tab-item" onclick="switchTab(1)">系统参数</div>
+      <div class="tab-item" onclick="switchTab(2)">模版维护</div>
+    </div>
+
+    <!-- TAB1: 用户管理 -->
+    <div class="tab-content active" id="tab-0">
+      <div class="card">
+        <div class="search-bar">
+          <input type="text" class="search-input" id="userSearch" placeholder="工号/姓名搜索">
+          <select class="search-select" id="userRole">
+            <option value="">全部角色</option>
+            <option value="采购员">采购员</option>
+            <option value="IT管理员">IT管理员</option>
+          </select>
+          <select class="search-select" id="userStatus">
+            <option value="">全部状态</option>
+            <option value="启用">启用</option>
+            <option value="禁用">禁用</option>
+          </select>
+          <button class="btn btn-primary" onclick="searchUsers()">查询</button>
+          <button class="btn" onclick="resetUserSearch()">重置</button>
+          <button class="btn btn-outline" onclick="openCreateUser()">+ 新建用户</button>
+        </div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>工号</th>
+              <th>姓名</th>
+              <th>角色</th>
+              <th>账号状态</th>
+              <th>创建时间</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="userTableBody"></tbody>
+        </table>
+        <div class="pagination">
+          <span class="page-info">共 5 条记录，第 1/1 页</span>
+          <div class="page-btns">
+            <button class="page-btn" disabled>&lt;</button>
+            <button class="page-btn active">1</button>
+            <button class="page-btn" disabled>&gt;</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB2: 系统参数 -->
+    <div class="tab-content" id="tab-1">
+      <div class="card">
+        <div class="card-title">系统参数配置</div>
+        <div class="param-list">
+          <div class="param-row">
+            <div class="param-name">报价抓取周期</div>
+            <div class="param-value">
+              <input type="number" class="param-input" id="param_fetchCycle" value="30" min="1">
+              <span class="param-unit">分钟</span>
+            </div>
+            <div class="param-default">默认值：30 分钟</div>
+          </div>
+          <div class="param-row">
+            <div class="param-name">询价单编号前缀</div>
+            <div class="param-value">
+              <input type="text" class="param-input text" id="param_rfqPrefix" value="RFQ">
+            </div>
+            <div class="param-default">默认值：RFQ</div>
+          </div>
+          <div class="param-row">
+            <div class="param-name">邮件发送重试次数</div>
+            <div class="param-value">
+              <input type="number" class="param-input" id="param_mailRetry" value="3" min="0" max="10">
+              <span class="param-unit">次</span>
+            </div>
+            <div class="param-default">默认值：3 次</div>
+          </div>
+          <div class="param-row">
+            <div class="param-name">ERP接口超时时间</div>
+            <div class="param-value">
+              <input type="number" class="param-input" id="param_erpTimeout" value="30" min="1">
+              <span class="param-unit">秒</span>
+            </div>
+            <div class="param-default">默认值：30 秒</div>
+          </div>
+          <div class="param-row">
+            <div class="param-name">ERP接口重试次数</div>
+            <div class="param-value">
+              <input type="number" class="param-input" id="param_erpRetry" value="3" min="0" max="10">
+              <span class="param-unit">次</span>
+            </div>
+            <div class="param-default">默认值：3 次</div>
+          </div>
+          <div class="param-row">
+            <div class="param-name">附件大小限制</div>
+            <div class="param-value">
+              <input type="number" class="param-input" id="param_attachSize" value="20" min="1">
+              <span class="param-unit">MB</span>
+            </div>
+            <div class="param-default">默认值：20 MB</div>
+          </div>
+        </div>
+        <div class="param-actions">
+          <button class="btn btn-primary" onclick="saveParams()">保存参数</button>
+          <button class="btn btn-outline" onclick="resetParams()">恢复默认值</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB3: 模版维护 -->
+    <div class="tab-content" id="tab-2">
+      <div class="card">
+        <div class="search-bar">
+          <input type="text" class="search-input" id="tplSearch" placeholder="模版名称搜索">
+          <button class="btn btn-primary" onclick="searchTemplates()">查询</button>
+          <button class="btn" onclick="resetTplSearch()">重置</button>
+          <button class="btn btn-outline" onclick="openCreateTpl()">+ 新建模版</button>
+        </div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>模版名称</th>
+              <th>四级品类</th>
+              <th>模版描述</th>
+              <th>模版文件</th>
+              <th>状态</th>
+              <th>创建人</th>
+              <th>创建时间</th>
+              <th>更新时间</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="tplTableBody"></tbody>
+        </table>
+        <div class="pagination">
+          <span class="page-info">共 3 条记录，第 1/1 页</span>
+          <div class="page-btns">
+            <button class="page-btn" disabled>&lt;</button>
+            <button class="page-btn active">1</button>
+            <button class="page-btn" disabled>&gt;</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end content -->
+</div><!-- end main -->
+
+<!-- 新建用户弹窗 -->
+<div class="modal-mask" id="createUserModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">新建用户</span>
+      <span class="modal-close" onclick="closeModal('createUserModal')">&times;</span>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <label class="form-label required">工号</label>
+        <input type="text" class="form-input" id="cu_id" placeholder="请输入工号">
+      </div>
+      <div class="form-row">
+        <label class="form-label required">姓名</label>
+        <input type="text" class="form-input" id="cu_name" placeholder="请输入姓名">
+      </div>
+      <div class="form-row">
+        <label class="form-label required">初始密码</label>
+        <input type="password" class="form-input" id="cu_pwd" placeholder="请输入初始密码">
+      </div>
+      <div class="form-row">
+        <label class="form-label required">角色</label>
+        <select class="form-select" id="cu_role">
+          <option value="">请选择角色</option>
+          <option value="采购员">采购员</option>
+          <option value="IT管理员">IT管理员</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('createUserModal')">取消</button>
+      <button class="btn btn-primary" onclick="submitCreateUser()">确定</button>
+    </div>
+  </div>
+</div>
+
+<!-- 编辑用户弹窗 -->
+<div class="modal-mask" id="editUserModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">编辑用户</span>
+      <span class="modal-close" onclick="closeModal('editUserModal')">&times;</span>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <label class="form-label">工号</label>
+        <input type="text" class="form-input readonly" id="eu_id" readonly>
+      </div>
+      <div class="form-row">
+        <label class="form-label required">姓名</label>
+        <input type="text" class="form-input" id="eu_name" placeholder="请输入姓名">
+      </div>
+      <div class="form-row">
+        <label class="form-label required">角色</label>
+        <select class="form-select" id="eu_role">
+          <option value="采购员">采购员</option>
+          <option value="IT管理员">IT管理员</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label class="form-label">密码</label>
+        <button class="btn btn-outline btn-sm" onclick="resetUserPwd()">重置密码</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('editUserModal')">取消</button>
+      <button class="btn btn-primary" onclick="submitEditUser()">确定</button>
+    </div>
+  </div>
+</div>
+
+<!-- 新建/编辑模版弹窗 -->
+<div class="modal-mask" id="tplModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="tplModalTitle">新建模版</span>
+      <span class="modal-close" onclick="closeModal('tplModal')">&times;</span>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <label class="form-label required">模版名称</label>
+        <input type="text" class="form-input" id="tpl_name" placeholder="请输入模版名称">
+      </div>
+      <div class="form-row">
+        <label class="form-label required">四级品类</label>
+        <select class="form-select" id="tpl_category">
+          <option value="">请选择品类</option>
+          <option value="泵类">泵类</option>
+          <option value="阀门">阀门</option>
+          <option value="轴承">轴承</option>
+          <option value="密封件">密封件</option>
+          <option value="电机">电机</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label class="form-label">模版描述</label>
+        <input type="text" class="form-input" id="tpl_desc" placeholder="请输入模版描述">
+      </div>
+      <div class="form-row">
+        <label class="form-label">模版文件</label>
+        <div class="upload-area">
+          <input type="file" id="tpl_file" accept=".xlsx,.xls,.docx,.doc" style="display:none" onchange="onFileSelect(this)">
+          <button class="btn btn-outline btn-sm" onclick="document.getElementById('tpl_file').click()">选择文件</button>
+          <span class="file-name" id="tpl_fileName">未选择文件</span>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('tplModal')">取消</button>
+      <button class="btn btn-primary" onclick="submitTpl()">确定</button>
+    </div>
+  </div>
+</div>
+
+<!-- 重置密码弹窗 -->
+<div class="modal-mask" id="resetPwdModal">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <span class="modal-title">重置密码</span>
+      <span class="modal-close" onclick="closeModal('resetPwdModal')">&times;</span>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <label class="form-label">工号</label>
+        <input type="text" class="form-input readonly" id="rp_id" readonly>
+      </div>
+      <div class="form-row">
+        <label class="form-label">姓名</label>
+        <input type="text" class="form-input readonly" id="rp_name" readonly>
+      </div>
+      <div class="form-row">
+        <label class="form-label required">新密码</label>
+        <input type="password" class="form-input" id="rp_pwd" placeholder="请输入新密码">
+      </div>
+      <div class="form-row">
+        <label class="form-label required">确认密码</label>
+        <input type="password" class="form-input" id="rp_pwd2" placeholder="请再次输入新密码">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('resetPwdModal')">取消</button>
+      <button class="btn btn-primary" onclick="submitResetPwd()">确定</button>
+    </div>
+  </div>
+</div>
+
+<!-- 确认弹窗 -->
+<div class="modal-mask" id="confirmModal">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <span class="modal-title">操作确认</span>
+      <span class="modal-close" onclick="closeModal('confirmModal')">&times;</span>
+    </div>
+    <div class="modal-body">
+      <p id="confirmMsg" style="font-size:14px;color:#606266;text-align:center;padding:10px 0;"></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('confirmModal')">取消</button>
+      <button class="btn btn-primary" id="confirmOkBtn" onclick="">确定</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<style>
+/* Table */
+.data-table{width:100%;border-collapse:collapse;font-size:13px;}
+.data-table thead{background:#fafafa;position:sticky;top:0;}
+.data-table th{padding:10px 12px;text-align:left;color:#909399;font-weight:600;border-bottom:1px solid #EBEEF5;white-space:nowrap;}
+.data-table td{padding:10px 12px;border-bottom:1px solid #EBEEF5;color:#606266;max-width:160px;}
+.data-table tr:hover{background:#fafafa;}
+.ellipsis{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px;}
+/* Tags */
+.tag{display:inline-block;padding:2px 10px;border-radius:4px;font-size:12px;white-space:nowrap;}
+.tag-success{background:#f0f9eb;color:#67c23a;}
+.tag-danger{background:#fef0f0;color:#f56c6c;}
+.tag-info{background:#ecf5ff;color:#409eff;}
+.tag-warning{background:#fdf6ec;color:#e6a23c;}
+/* Buttons */
+.btn{padding:8px 18px;border-radius:4px;font-size:13px;cursor:pointer;border:1px solid #dcdfe6;background:#fff;color:#606266;transition:all .2s;white-space:nowrap;}
+.btn:hover{border-color:#E6740A;color:#E6740A;}
+.btn-primary{background:#E6740A;color:#fff;border-color:#E6740A;}
+.btn-primary:hover{background:#cf6609;border-color:#cf6609;color:#fff;}
+.btn-outline{background:#fff;color:#E6740A;border-color:#E6740A;}
+.btn-outline:hover{background:#fef6f0;}
+.btn-danger{background:#fff;color:#f56c6c;border-color:#f56c6c;}
+.btn-danger:hover{background:#fef0f0;}
+.btn-sm{padding:5px 12px;font-size:12px;}
+.btn-link{background:none;border:none;color:#E6740A;cursor:pointer;font-size:13px;padding:0 4px;text-decoration:none;}
+.btn-link:hover{text-decoration:underline;}
+.btn-link.danger{color:#f56c6c;}
+.btn-link.danger:hover{color:#e04040;}
+.btn-link.success{color:#67c23a;}
+.btn-link.success:hover{color:#529b2e;}
+.btn-link.disabled{color:#c0c4cc;cursor:not-allowed;}
+.file-link{color:#E6740A;text-decoration:none;font-size:13px;}
+.file-link:hover{text-decoration:underline;}
+/* Switch */
+.switch{position:relative;display:inline-block;width:40px;height:20px;vertical-align:middle;}
+.switch input{opacity:0;width:0;height:0;}
+.switch .slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#dcdfe6;border-radius:20px;transition:.3s;}
+.switch .slider:before{position:absolute;content:"";height:16px;width:16px;left:2px;bottom:2px;background:#fff;border-radius:50%;transition:.3s;}
+.switch input:checked+.slider{background:#E6740A;}
+.switch input:checked+.slider:before{transform:translateX(20px);}
+/* Pagination */
+.pagination{display:flex;align-items:center;justify-content:space-between;padding:12px 0 0;font-size:13px;color:#909399;}
+.page-btns{display:flex;gap:4px;}
+.page-btn{width:30px;height:30px;border:1px solid #dcdfe6;border-radius:4px;background:#fff;cursor:pointer;font-size:13px;color:#606266;display:flex;align-items:center;justify-content:center;}
+.page-btn.active{background:#E6740A;color:#fff;border-color:#E6740A;}
+.page-btn:disabled{color:#c0c4cc;cursor:not-allowed;}
+/* Modal */
+.modal-mask{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:200;align-items:center;justify-content:center;}
+.modal-mask.show{display:flex;}
+.modal{background:#fff;border-radius:8px;width:500px;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 8px 24px rgba(0,0,0,.15);}
+.modal-sm{width:400px;}
+.modal-lg{width:650px;}
+.modal-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #EBEEF5;flex-shrink:0;}
+.modal-title{font-size:16px;font-weight:600;color:#333;}
+.modal-close{font-size:22px;color:#909399;cursor:pointer;line-height:1;}
+.modal-close:hover{color:#606266;}
+.modal-body{padding:20px;overflow-y:auto;flex:1;}
+.modal-footer{padding:12px 20px;border-top:1px solid #EBEEF5;display:flex;justify-content:flex-end;gap:10px;flex-shrink:0;}
+/* Form in modal */
+.form-row{display:flex;align-items:center;margin-bottom:16px;gap:10px;}
+.form-row:last-child{margin-bottom:0;}
+.form-label{min-width:90px;font-size:13px;color:#606266;text-align:right;flex-shrink:0;}
+.form-label.required::before{content:"*";color:#f56c6c;margin-right:3px;}
+.form-input{height:34px;border:1px solid #dcdfe6;border-radius:4px;padding:0 10px;font-size:13px;outline:none;flex:1;min-width:0;}
+.form-input:focus{border-color:#E6740A;}
+.form-input.readonly{background:#f5f7fa;color:#909399;cursor:not-allowed;border-color:#e4e7ed;}
+.form-select{height:34px;border:1px solid #dcdfe6;border-radius:4px;padding:0 8px;font-size:13px;outline:none;flex:1;min-width:0;background:#fff;}
+.form-select:focus{border-color:#E6740A;}
+.form-input.error,.form-select.error{border-color:#f56c6c;}
+.upload-area{display:flex;align-items:center;gap:10px;flex:1;}
+.file-name{font-size:13px;color:#909399;}
+/* Param styles */
+.param-list{display:flex;flex-direction:column;gap:0;}
+.param-row{display:flex;align-items:center;padding:14px 0;border-bottom:1px solid #EBEEF5;}
+.param-row:last-child{border-bottom:none;}
+.param-name{width:180px;font-size:14px;color:#333;font-weight:500;flex-shrink:0;}
+.param-value{display:flex;align-items:center;gap:6px;width:220px;}
+.param-input{height:34px;border:1px solid #dcdfe6;border-radius:4px;padding:0 10px;font-size:13px;outline:none;width:100px;text-align:center;}
+.param-input.text{width:140px;text-align:left;}
+.param-input:focus{border-color:#E6740A;}
+.param-unit{font-size:13px;color:#909399;}
+.param-default{font-size:12px;color:#c0c4cc;margin-left:20px;}
+.param-actions{display:flex;gap:10px;margin-top:20px;padding-top:16px;border-top:1px solid #EBEEF5;}
+/* Toast */
+.toast{display:none;position:fixed;top:80px;left:50%;transform:translateX(-50%);background:#67c23a;color:#fff;padding:10px 28px;border-radius:6px;font-size:14px;z-index:999;box-shadow:0 4px 12px rgba(0,0,0,.15);}
+.toast.error{background:#f56c6c;}
+.toast.show{display:block;animation:fadeInOut 2s ease;}
+@keyframes fadeInOut{0%{opacity:0;transform:translateX(-50%) translateY(-10px);}10%{opacity:1;transform:translateX(-50%) translateY(0);}80%{opacity:1;}100%{opacity:0;}}
+</style>
+
+<script>
+// ===== 示例数据 =====
+var users = [
+  {id:'0707',name:'张华',role:'采购员',status:'启用',time:'2026-01-10 09:00'},
+  {id:'0808',name:'于芳芳',role:'采购员',status:'启用',time:'2026-01-15 10:30'},
+  {id:'1001',name:'李伟',role:'采购员',status:'启用',time:'2026-02-01 08:00'},
+  {id:'1002',name:'王磊',role:'采购员',status:'禁用',time:'2026-02-20 14:00'},
+  {id:'admin',name:'管理员',role:'IT管理员',status:'启用',time:'2026-01-01 00:00'}
+];
+var templates = [
+  {name:'标准询价单模版',cat:'泵类',desc:'通用询价单格式',file:'标准询价单.xlsx',status:'启用',creator:'管理员',ctime:'2026-01-05',utime:'2026-01-05'},
+  {name:'年度合同询价模版',cat:'阀门',desc:'年度合同专用',file:'年度合同询价.docx',status:'启用',creator:'管理员',ctime:'2026-02-10',utime:'2026-02-10'},
+  {name:'紧急采购询价模版',cat:'轴承',desc:'紧急采购专用',file:'紧急采购询价.xlsx',status:'禁用',creator:'管理员',ctime:'2026-03-15',utime:'2026-03-15'}
+];
+var defaultParams = {fetchCycle:30,rfqPrefix:'RFQ',mailRetry:3,erpTimeout:30,erpRetry:3,attachSize:20};
+var editingUserIdx = -1;
+var editingTplIdx = -1;
+
+// ===== Toast =====
+function showToast(msg, isError) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast' + (isError ? ' error' : '') + ' show';
+  setTimeout(function(){ t.className = 'toast'; }, 2000);
+}
+
+// ===== Modal =====
+function openModal(id) { document.getElementById(id).classList.add('show'); }
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+
+// ===== Tab切换 =====
+function switchTab(idx) {
+  document.querySelectorAll('.tab-item').forEach(function(t,i){ t.classList.toggle('active', i===idx); });
+  document.querySelectorAll('.tab-content').forEach(function(c,i){ c.classList.toggle('active', i===idx); });
+}
+
+// Sidebar menu - navigation via links
+
+// ===== 用户管理 =====
+function renderUsers() {
+  var tbody = document.getElementById('userTableBody');
+  var html = '';
+  users.forEach(function(u, i) {
+    var checked = u.status === '启用' ? ' checked' : '';
+    var switchHtml = '<label class="switch"><input type="checkbox"'+checked+' onchange="toggleUserStatus('+i+',this)"><span class="slider"></span></label>';
+    html += '<tr><td>'+u.id+'</td><td>'+u.name+'</td><td>'+u.role+'</td><td>'+switchHtml+'</td><td>'+u.time+'</td><td><button class="btn-link" onclick="openEditUser('+i+')">编辑</button><button class="btn-link" onclick="resetPwd('+i+')">重置密码</button></td></tr>';
+  });
+  tbody.innerHTML = html;
+}
+
+function searchUsers() {
+  showToast('查询完成');
+}
+function resetUserSearch() {
+  document.getElementById('userSearch').value = '';
+  document.getElementById('userRole').value = '';
+  document.getElementById('userStatus').value = '';
+  showToast('已重置筛选条件');
+}
+
+function openCreateUser() {
+  document.getElementById('cu_id').value = '';
+  document.getElementById('cu_name').value = '';
+  document.getElementById('cu_pwd').value = '';
+  document.getElementById('cu_role').value = '';
+  clearErrors('createUserModal');
+  openModal('createUserModal');
+}
+
+function submitCreateUser() {
+  clearErrors('createUserModal');
+  var id = document.getElementById('cu_id').value.trim();
+  var name = document.getElementById('cu_name').value.trim();
+  var pwd = document.getElementById('cu_pwd').value.trim();
+  var role = document.getElementById('cu_role').value;
+  var valid = true;
+  if (!id) { markError('cu_id'); valid = false; }
+  if (!name) { markError('cu_name'); valid = false; }
+  if (!pwd) { markError('cu_pwd'); valid = false; }
+  if (!role) { markError('cu_role'); valid = false; }
+  if (!valid) { showToast('请填写所有必填项', true); return; }
+  // 检查工号唯一
+  for (var i = 0; i < users.length; i++) {
+    if (users[i].id === id) { showToast('该工号已存在', true); markError('cu_id'); return; }
+  }
+  var now = new Date();
+  var ts = now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate())+' '+pad(now.getHours())+':'+pad(now.getMinutes());
+  users.push({id:id,name:name,role:role,status:'启用',time:ts});
+  renderUsers();
+  closeModal('createUserModal');
+  showToast('用户创建成功');
+}
+
+function openEditUser(idx) {
+  editingUserIdx = idx;
+  var u = users[idx];
+  document.getElementById('eu_id').value = u.id;
+  document.getElementById('eu_name').value = u.name;
+  document.getElementById('eu_role').value = u.role;
+  clearErrors('editUserModal');
+  openModal('editUserModal');
+}
+
+function submitEditUser() {
+  clearErrors('editUserModal');
+  var name = document.getElementById('eu_name').value.trim();
+  var role = document.getElementById('eu_role').value;
+  var valid = true;
+  if (!name) { markError('eu_name'); valid = false; }
+  if (!role) { markError('eu_role'); valid = false; }
+  if (!valid) { showToast('请填写所有必填项', true); return; }
+  users[editingUserIdx].name = name;
+  users[editingUserIdx].role = role;
+  renderUsers();
+  closeModal('editUserModal');
+  showToast('用户信息更新成功');
+}
+
+function resetUserPwd() {
+  showToast('密码已重置为默认密码');
+}
+
+function toggleUserStatus(idx, el) {
+  var u = users[idx];
+  var action = u.status === '启用' ? '禁用' : '启用';
+  // Revert switch immediately, confirm first
+  el.checked = u.status === '启用';
+  // 禁用IT管理员时检查是否还有其他启用的IT管理员
+  if (action === '禁用' && u.role === 'IT管理员') {
+    var activeAdmins = users.filter(function(x, i) { return x.role === 'IT管理员' && x.status === '启用' && i !== idx; });
+    if (activeAdmins.length === 0) {
+      showToast('系统中至少需要保留一个启用状态的IT管理员', true);
+      return;
+    }
+  }
+  document.getElementById('confirmMsg').textContent = '是否确认' + action + '用户 "' + u.name + '"？';
+  document.getElementById('confirmOkBtn').onclick = function() {
+    users[idx].status = action;
+    renderUsers();
+    closeModal('confirmModal');
+    showToast('用户已' + action);
+  };
+  openModal('confirmModal');
+}
+
+function resetPwd(idx) {
+  var u = users[idx];
+  document.getElementById('rp_id').value = u.id;
+  document.getElementById('rp_name').value = u.name;
+  document.getElementById('rp_pwd').value = '';
+  document.getElementById('rp_pwd2').value = '';
+  clearErrors('resetPwdModal');
+  openModal('resetPwdModal');
+}
+
+function submitResetPwd() {
+  clearErrors('resetPwdModal');
+  var pwd = document.getElementById('rp_pwd').value.trim();
+  var pwd2 = document.getElementById('rp_pwd2').value.trim();
+  if (!pwd) { markError('rp_pwd'); showToast('请输入新密码', true); return; }
+  if (!pwd2) { markError('rp_pwd2'); showToast('请确认新密码', true); return; }
+  if (pwd !== pwd2) { markError('rp_pwd2'); showToast('两次输入的密码不一致', true); return; }
+  closeModal('resetPwdModal');
+  showToast('密码重置成功');
+}
+
+// ===== 系统参数 =====
+function saveParams() {
+  var fc = document.getElementById('param_fetchCycle').value;
+  var mr = document.getElementById('param_mailRetry').value;
+  var et = document.getElementById('param_erpTimeout').value;
+  var er = document.getElementById('param_erpRetry').value;
+  var as = document.getElementById('param_attachSize').value;
+  var prefix = document.getElementById('param_rfqPrefix').value.trim();
+  if (!fc || fc < 1) { showToast('报价抓取周期需大于0', true); return; }
+  if (!prefix) { showToast('询价单编号前缀不能为空', true); return; }
+  if (mr === '' || mr < 0) { showToast('邮件发送重试次数不合法', true); return; }
+  if (!et || et < 1) { showToast('ERP接口超时时间需大于0', true); return; }
+  if (er === '' || er < 0) { showToast('ERP接口重试次数不合法', true); return; }
+  if (!as || as < 1) { showToast('附件大小限制需大于0', true); return; }
+  showToast('系统参数保存成功');
+}
+
+function resetParams() {
+  document.getElementById('param_fetchCycle').value = defaultParams.fetchCycle;
+  document.getElementById('param_rfqPrefix').value = defaultParams.rfqPrefix;
+  document.getElementById('param_mailRetry').value = defaultParams.mailRetry;
+  document.getElementById('param_erpTimeout').value = defaultParams.erpTimeout;
+  document.getElementById('param_erpRetry').value = defaultParams.erpRetry;
+  document.getElementById('param_attachSize').value = defaultParams.attachSize;
+  showToast('已恢复默认值');
+}
+
+// ===== 模版维护 =====
+function renderTemplates() {
+  var tbody = document.getElementById('tplTableBody');
+  var html = '';
+  templates.forEach(function(t, i) {
+    html += '<tr>';
+    html += '<td class="ellipsis" title="'+t.name+'">'+t.name+'</td>';
+    html += '<td>'+t.cat+'</td>';
+    html += '<td class="ellipsis" title="'+t.desc+'">'+t.desc+'</td>';
+    html += '<td><a href="javascript:;" class="file-link">'+t.file+'</a></td>';
+    var statusSwitch = '<label class="switch"><input type="checkbox"'+(t.status==='启用'?' checked':'')+' onchange="toggleTplStatus('+i+',this)"><span class="slider"></span></label>';
+    html += '<td>'+statusSwitch+'</td>';
+    html += '<td>'+t.creator+'</td>';
+    html += '<td>'+t.ctime+'</td>';
+    html += '<td>'+t.utime+'</td>';
+    html += '<td><button class="btn-link" onclick="openEditTpl('+i+')">编辑</button><button class="btn-link danger" onclick="deleteTpl('+i+')">删除</button></td>';
+    html += '</tr>';
+  });
+  tbody.innerHTML = html;
+}
+
+function searchTemplates() { showToast('查询完成'); }
+function resetTplSearch() {
+  document.getElementById('tplSearch').value = '';
+  showToast('已重置筛选条件');
+}
+
+function openCreateTpl() {
+  editingTplIdx = -1;
+  document.getElementById('tplModalTitle').textContent = '新建模版';
+  document.getElementById('tpl_name').value = '';
+  document.getElementById('tpl_category').value = '';
+  document.getElementById('tpl_desc').value = '';
+  document.getElementById('tpl_file').value = '';
+  document.getElementById('tpl_fileName').textContent = '未选择文件';
+  clearErrors('tplModal');
+  openModal('tplModal');
+}
+
+function openEditTpl(idx) {
+  editingTplIdx = idx;
+  var t = templates[idx];
+  document.getElementById('tplModalTitle').textContent = '编辑模版';
+  document.getElementById('tpl_name').value = t.name;
+  document.getElementById('tpl_category').value = t.cat;
+  document.getElementById('tpl_desc').value = t.desc;
+  document.getElementById('tpl_file').value = '';
+  document.getElementById('tpl_fileName').textContent = t.file;
+  clearErrors('tplModal');
+  openModal('tplModal');
+}
+
+function submitTpl() {
+  clearErrors('tplModal');
+  var name = document.getElementById('tpl_name').value.trim();
+  var cat = document.getElementById('tpl_category').value;
+  var valid = true;
+  if (!name) { markError('tpl_name'); valid = false; }
+  if (!cat) { markError('tpl_category'); valid = false; }
+  if (!valid) { showToast('请填写所有必填项', true); return; }
+  // 检查名称唯一
+  for (var i = 0; i < templates.length; i++) {
+    if (templates[i].name === name && i !== editingTplIdx) {
+      showToast('模版名称已存在', true); markError('tpl_name'); return;
+    }
+  }
+  if (editingTplIdx === -1) {
+    var now = new Date();
+    var ds = now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());
+    var fileName = document.getElementById('tpl_fileName').textContent;
+    templates.push({name:name,cat:cat,desc:document.getElementById('tpl_desc').value.trim(),file:fileName==='未选择文件'?'--':fileName,status:'启用',creator:'管理员',ctime:ds,utime:ds});
+    showToast('模版创建成功');
+  } else {
+    templates[editingTplIdx].name = name;
+    templates[editingTplIdx].cat = cat;
+    templates[editingTplIdx].desc = document.getElementById('tpl_desc').value.trim();
+    var fn = document.getElementById('tpl_fileName').textContent;
+    if (fn !== '未选择文件') templates[editingTplIdx].file = fn;
+    var now2 = new Date();
+    templates[editingTplIdx].utime = now2.getFullYear()+'-'+pad(now2.getMonth()+1)+'-'+pad(now2.getDate());
+    showToast('模版更新成功');
+  }
+  renderTemplates();
+  closeModal('tplModal');
+}
+
+function toggleTplStatus(idx, el) {
+  var t = templates[idx];
+  var action = t.status === '启用' ? '禁用' : '启用';
+  el.checked = t.status === '启用';
+  document.getElementById('confirmMsg').textContent = '是否确认' + action + '模版 "' + t.name + '"？';
+  document.getElementById('confirmOkBtn').onclick = function() {
+    templates[idx].status = action;
+    renderTemplates();
+    closeModal('confirmModal');
+    showToast('模版已' + action);
+  };
+  openModal('confirmModal');
+}
+
+function deleteTpl(idx) {
+  var t = templates[idx];
+  // 模拟：第一个模版已被引用
+  if (idx === 0) {
+    document.getElementById('confirmMsg').innerHTML = '模版 "' + t.name + '" 已被询价单引用，<span style="color:#f56c6c;font-weight:600;">不允许删除</span>，仅允许禁用。';
+    document.getElementById('confirmOkBtn').onclick = function() { closeModal('confirmModal'); };
+    openModal('confirmModal');
+    return;
+  }
+  document.getElementById('confirmMsg').textContent = '是否确认删除模版 "' + t.name + '"？删除后不可恢复。';
+  document.getElementById('confirmOkBtn').onclick = function() {
+    templates.splice(idx, 1);
+    renderTemplates();
+    closeModal('confirmModal');
+    showToast('模版已删除');
+  };
+  openModal('confirmModal');
+}
+
+function onFileSelect(input) {
+  var name = input.files && input.files[0] ? input.files[0].name : '未选择文件';
+  document.getElementById('tpl_fileName').textContent = name;
+}
+
+// ===== 工具函数 =====
+function pad(n) { return n < 10 ? '0' + n : '' + n; }
+
+function markError(id) {
+  var el = document.getElementById(id);
+  if (el) el.classList.add('error');
+}
+function clearErrors(modalId) {
+  document.querySelectorAll('#' + modalId + ' .error').forEach(function(el) { el.classList.remove('error'); });
+}
+
+// ===== 初始化 =====
+renderUsers();
+renderTemplates();
+</script>
+</body>
+</html>
