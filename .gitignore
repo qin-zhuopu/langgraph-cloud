@@ -53,3 +53,9 @@ Thumbs.db
 .claude-trace/
 .claude/
 skills-lock.json
+
+# Kiro
+.kiro/
+
+# Obsidian
+.obsidian/
